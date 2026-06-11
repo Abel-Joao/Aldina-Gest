@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aldina Gest — Sistema de Gestão e Facturação para Angola</title>
+<link rel="icon" type="image/png" href="assets/aldina-gest-logo.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@400;600&display=swap" rel="stylesheet">
+<script src="assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#0a0a0e;--bg2:#111116;--bg3:#18181f;--bg4:#1e1e27;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+  --text:#f0eff4;--text2:#9896a4;--text3:#5c5a68;
+  --accent:#6c63ff;--accent2:#8b85ff;--accent3:rgba(108,99,255,0.15);
+  --green:#22c55e;--green-bg:rgba(34,197,94,0.1);
+  --amber:#f59e0b;--amber-bg:rgba(245,158,11,0.1);
+  --red:#ef4444;--red-bg:rgba(239,68,68,0.1);
+  --gold:#f59e0b;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;--serif:'Playfair Display',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;overflow-x:hidden}
+
+/* LOADING */
+.app-loader{position:fixed;inset:0;z-index:1000;background:radial-gradient(circle at 50% 38%,rgba(59,130,246,.14),transparent 34%),var(--bg);display:flex;align-items:center;justify-content:center;transition:opacity .35s ease,visibility .35s ease}
+.app-loader.hide{opacity:0;visibility:hidden}
+.loader-card{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;animation:fadeUp .35s ease both}
+.loader-logo{width:min(240px,58vw);aspect-ratio:1;background:#fff;border-radius:20px;padding:16px;object-fit:contain;box-shadow:0 28px 90px rgba(0,0,0,.48),0 0 0 1px rgba(255,255,255,.08)}
+.loader-title{font-size:13px;font-weight:700;color:var(--text);letter-spacing:.4px;text-transform:uppercase}
+.loader-bar{width:150px;height:3px;border-radius:999px;overflow:hidden;background:var(--bg4)}
+.loader-bar::before{content:'';display:block;width:42%;height:100%;background:linear-gradient(90deg,#0b3769,#0d87ff);border-radius:999px;animation:loadPulse 1s ease-in-out infinite}
+@keyframes loadPulse{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:0 5%;height:68px;display:flex;align-items:center;gap:32px;background:rgba(10,10,14,0.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-mark{width:44px;height:44px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:4px;box-shadow:0 10px 30px rgba(0,0,0,.24)}
+.nav-logo-mark img{width:100%;height:100%;object-fit:contain;display:block}
+.nav-logo-text{font-size:17px;font-weight:700;color:var(--text);letter-spacing:-.3px}
+.nav-links{display:flex;gap:28px;margin-left:32px}
+.nav-links a{color:var(--text2);text-decoration:none;font-size:14px;font-weight:500;transition:color .15s}
+.nav-links a:hover{color:var(--text)}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;border:none;font-family:var(--font);transition:all .15s;text-decoration:none}
+.btn-ghost{background:none;color:var(--text2);border:1px solid var(--border2)}.btn-ghost:hover{background:var(--bg3);color:var(--text)}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent2);transform:translateY(-1px)}
+.btn-lg{padding:13px 28px;font-size:15px;font-weight:600;border-radius:10px}
+.btn-outline{background:none;color:var(--accent2);border:2px solid var(--accent);font-weight:600}.btn-outline:hover{background:var(--accent3)}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:100px 5% 80px;position:relative;overflow:hidden}
+.hero-glow{position:absolute;top:20%;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(108,99,255,0.15) 0%,transparent 70%);pointer-events:none}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);background-size:48px 48px;pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:var(--accent3);border:1px solid rgba(108,99,255,.3);border-radius:20px;padding:5px 14px;font-size:12px;color:var(--accent2);font-weight:500;margin-bottom:24px}
+.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+.hero-title{font-size:clamp(36px,6vw,72px);font-weight:700;letter-spacing:-1.5px;line-height:1.1;margin-bottom:20px;max-width:840px}
+.hero-title span{background:linear-gradient(135deg,var(--accent2),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:clamp(16px,2vw,20px);color:var(--text2);max-width:560px;margin:0 auto 40px;line-height:1.65}
+.hero-ctas{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.hero-meta{margin-top:18px;font-size:13px;color:var(--text3)}
+.hero-meta strong{color:var(--text2)}
+.hero-screen{margin-top:64px;position:relative;max-width:980px;width:100%;margin-left:auto;margin-right:auto}
+.hero-screen-frame{background:var(--bg3);border:1px solid var(--border2);border-radius:16px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,0.05)}
+.hero-screen-bar{height:36px;background:var(--bg4);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px}
+.dot{width:10px;height:10px;border-radius:50%}
+.screen-inner{padding:20px;display:grid;grid-template-columns:160px 1fr;gap:14px;height:280px}
+.mock-sidebar{background:var(--bg4);border-radius:10px;padding:14px 12px;display:flex;flex-direction:column;gap:6px}
+.mock-logo{height:42px;background:#fff url("assets/aldina-gest-logo.png") center/contain no-repeat;border-radius:8px;margin-bottom:8px}
+.mock-nav{height:28px;border-radius:6px;background:rgba(255,255,255,.05)}
+.mock-nav.active{background:var(--accent3);opacity:.9}
+.mock-main{display:flex;flex-direction:column;gap:10px}
+.mock-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.mock-kpi{background:var(--bg4);border-radius:8px;height:52px;border:1px solid var(--border);position:relative;overflow:hidden}
+.mock-kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:8px 8px 0 0}
+.mock-kpi:nth-child(1)::after{background:var(--green)}
+.mock-kpi:nth-child(2)::after{background:var(--accent)}
+.mock-kpi:nth-child(3)::after{background:var(--amber)}
+.mock-kpi:nth-child(4)::after{background:var(--red)}
+.mock-chart{background:var(--bg4);border-radius:8px;flex:1;border:1px solid var(--border);display:flex;align-items:flex-end;padding:12px;gap:4px}
+.mock-bar{border-radius:3px 3px 0 0;flex:1}
+
+/* SECTIONS */
+section{padding:80px 5%}
+.section-badge{display:inline-flex;align-items:center;gap:7px;background:var(--accent3);border:1px solid rgba(108,99,255,.25);border-radius:20px;padding:4px 13px;font-size:12px;color:var(--accent2);font-weight:500;margin-bottom:18px}
+.section-title{font-size:clamp(28px,4vw,44px);font-weight:700;letter-spacing:-.5px;line-height:1.2;margin-bottom:14px;max-width:640px}
+.section-sub{font-size:16px;color:var(--text2);max-width:520px;line-height:1.65;margin-bottom:48px}
+
+/* FEATURES */
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.feat-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;transition:all .2s;cursor:default}
+.feat-card:hover{border-color:var(--border2);transform:translateY(-2px);background:var(--bg3)}
+.feat-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px}
+.feat-title{font-size:16px;font-weight:600;margin-bottom:8px}
+.feat-desc{font-size:13px;color:var(--text2);line-height:1.6}
+.feat-tag{display:inline-block;margin-top:12px;font-size:10px;padding:2px 8px;border-radius:6px;font-weight:600;letter-spacing:.4px}
+
+/* AGT SECTION */
+.agt-block{background:linear-gradient(135deg,rgba(34,197,94,0.07),rgba(34,197,94,0.03));border:1px solid rgba(34,197,94,0.2);border-radius:16px;padding:32px;display:flex;gap:28px;align-items:center}
+.agt-icon-wrap{width:64px;height:64px;border-radius:14px;background:var(--green-bg);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
+.agt-content h3{font-size:20px;font-weight:700;margin-bottom:8px}
+.agt-content p{font-size:14px;color:var(--text2);line-height:1.65;margin-bottom:14px}
+.agt-tags{display:flex;gap:8px;flex-wrap:wrap}
+.agt-tag{font-size:11px;padding:3px 10px;border-radius:8px;background:var(--green-bg);color:var(--green);font-weight:500}
+
+/* PRICING */
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:900px;margin:0 auto}
+.price-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:28px;position:relative;transition:all .2s}
+.price-card.popular{border-color:var(--accent);background:linear-gradient(135deg,rgba(108,99,255,0.08),var(--bg2))}
+.popular-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:11px;font-weight:600;padding:3px 14px;border-radius:10px;white-space:nowrap}
+.price-plan{font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.price-amount{font-size:36px;font-weight:700;letter-spacing:-1px;margin-bottom:4px}
+.price-amount span{font-size:14px;color:var(--text2);font-weight:400}
+.price-period{font-size:12px;color:var(--text3);margin-bottom:20px}
+.price-features{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.price-feat{display:flex;align-items:center;gap:9px;font-size:13px}
+.price-feat .check{color:var(--green);font-size:12px;flex-shrink:0}
+.price-feat .cross{color:var(--text3);font-size:12px;flex-shrink:0}
+.trial-note{text-align:center;font-size:12px;color:var(--text3);margin-top:24px}
+.trial-note strong{color:var(--accent2)}
+.payment-box{max-width:900px;margin:28px auto 0;background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:24px}
+.payment-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
+.payment-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.payment-sub{font-size:13px;color:var(--text2)}
+.payment-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.bank-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px}
+.bank-name{font-size:12px;color:var(--accent2);font-weight:700;letter-spacing:.5px;margin-bottom:8px}
+.bank-iban{font-family:var(--mono);font-size:12px;color:var(--text);line-height:1.5;word-break:break-word}
+.bank-holder{font-size:12px;color:var(--text2);margin-top:12px}
+.whatsapp-link{display:inline-flex;align-items:center;gap:7px;background:var(--green-bg);border:1px solid rgba(34,197,94,.25);color:var(--green);text-decoration:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;white-space:nowrap}
+
+/* STATS */
+.stats-band{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:48px 5%;display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center}
+.stat-number{font-size:36px;font-weight:700;letter-spacing:-1px;margin-bottom:6px}
+.stat-label{font-size:13px;color:var(--text2)}
+
+/* TESTIMONIALS */
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.testi-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:22px}
+.testi-stars{color:var(--gold);font-size:13px;margin-bottom:12px;letter-spacing:2px}
+.testi-text{font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:16px;font-style:italic}
+.testi-author{display:flex;align-items:center;gap:10px}
+.testi-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+.testi-name{font-size:13px;font-weight:500}
+.testi-co{font-size:11px;color:var(--text3)}
+
+/* CTA FINAL */
+.cta-final{background:linear-gradient(135deg,rgba(108,99,255,0.12),rgba(108,99,255,0.04));border:1px solid rgba(108,99,255,0.2);border-radius:20px;padding:64px 5%;text-align:center;margin:0 5% 80px}
+.cta-final h2{font-size:clamp(28px,4vw,48px);font-weight:700;letter-spacing:-.5px;margin-bottom:16px}
+.cta-final p{font-size:16px;color:var(--text2);margin-bottom:32px}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:40px 5%;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-logo{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700}
+.footer-logo .nav-logo-mark{width:32px;height:32px;border-radius:8px;padding:3px}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:13px;color:var(--text3);text-decoration:none;transition:color .15s}
+.footer-links a:hover{color:var(--text2)}
+.footer-copy{font-size:12px;color:var(--text3)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);padding:20px}
+.modal-overlay.open{display:flex}
+.auth-modal{background:var(--bg2);border:1px solid var(--border2);border-radius:20px;width:100%;max-width:440px;padding:36px;animation:fadeUp .25s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.auth-logo{display:flex;align-items:center;justify-content:center;margin-bottom:28px}
+.auth-logo-img{width:138px;aspect-ratio:1;background:#fff;border-radius:14px;padding:10px;object-fit:contain;box-shadow:0 18px 46px rgba(0,0,0,.28)}
+.auth-title{font-size:22px;font-weight:700;text-align:center;margin-bottom:6px}
+.auth-sub{font-size:13px;color:var(--text2);text-align:center;margin-bottom:28px}
+.form-group{margin-bottom:14px}
+.form-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:500;margin-bottom:5px;display:block}
+.form-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:10px 13px;color:var(--text);font-family:var(--font);font-size:14px;outline:none;transition:border-color .15s}
+.form-input:focus{border-color:var(--accent)}
+.form-input::placeholder{color:var(--text3)}
+.btn-full{width:100%;justify-content:center;padding:12px;font-size:15px;border-radius:9px;margin-top:6px}
+.auth-switch{text-align:center;font-size:13px;color:var(--text2);margin-top:18px}
+.auth-switch a{color:var(--accent2);cursor:pointer;font-weight:500}
+.trial-banner{background:linear-gradient(135deg,var(--green-bg),rgba(34,197,94,.05));border:1px solid rgba(34,197,94,.2);border-radius:9px;padding:12px 14px;font-size:12px;color:var(--green);text-align:center;margin-bottom:18px}
+.trial-banner strong{font-weight:600}
+.divider{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--text3);font-size:12px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:12px 18px;font-size:13px;display:flex;align-items:center;gap:10px;z-index:999;transform:translateY(80px);opacity:0;transition:all .3s;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08);color:var(--green)}
+.toast.error{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:var(--red)}
+
+/* ANIMATIONS */
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.float{animation:float 4s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+.pulse{animation:pulse-dot 2s ease-in-out infinite}
+
+/* RESPONSIVE */
+@media (max-width:1100px){
+  nav{gap:18px}
+  .nav-links{gap:18px;margin-left:12px}
+  .features-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+@media (max-width:900px){
+  nav{height:auto;min-height:66px;padding:10px 5%;gap:12px}
+  .nav-links{display:none}
+  .nav-right{margin-left:auto}
+  .hero{min-height:auto;padding:104px 5% 64px}
+  .hero-title{font-size:clamp(34px,8vw,56px);letter-spacing:-.8px}
+  .hero-screen{margin-top:44px}
+  .screen-inner{grid-template-columns:130px 1fr;height:260px;padding:14px}
+  .mock-kpis{grid-template-columns:repeat(2,1fr)}
+  .agt-block{align-items:flex-start}
+  .pricing-grid{grid-template-columns:1fr;max-width:520px}
+  .payment-grid{grid-template-columns:1fr}
+  .payment-head{flex-direction:column}
+  .price-card.popular{order:-1}
+  .stats-band{grid-template-columns:repeat(2,1fr)}
+  .testi-grid{grid-template-columns:1fr}
+  footer{align-items:flex-start;flex-direction:column}
+  .footer-links{flex-wrap:wrap;gap:12px 20px}
+}
+
+@media (max-width:640px){
+  nav{padding:10px 18px}
+  .nav-logo-mark{width:40px;height:40px}
+  .nav-logo-text{font-size:16px}
+  .nav-right .btn{padding:8px 12px;font-size:13px}
+  .nav-right .btn-primary{display:none}
+  section{padding:58px 18px}
+  .hero{padding:94px 18px 52px}
+  .hero-badge{font-size:11px;max-width:100%;text-align:left}
+  .hero-title{font-size:38px;line-height:1.08}
+  .hero-sub{font-size:16px;margin-bottom:28px}
+  .hero-ctas{width:100%;gap:10px}
+  .hero-ctas .btn{width:100%;justify-content:center}
+  .hero-meta{font-size:12px;max-width:300px;margin-left:auto;margin-right:auto}
+  .hero-screen-frame{border-radius:12px}
+  .screen-inner{grid-template-columns:1fr;height:250px;padding:12px}
+  .mock-sidebar{display:none}
+  .mock-chart{min-height:120px}
+  .features-grid{grid-template-columns:1fr}
+  .agt-block{flex-direction:column;padding:24px}
+  .cta-final{margin:0 18px 58px;padding:42px 22px;border-radius:16px}
+  .auth-modal{padding:28px 22px;border-radius:16px}
+  .auth-logo-img{width:112px}
+  .toast{left:18px;right:18px;bottom:18px}
+}
+
+@media (max-width:420px){
+  .nav-logo-text{display:none}
+  .hero-title{font-size:34px}
+  .btn-lg{padding:12px 18px}
+  .stats-band{grid-template-columns:1fr;padding:38px 18px}
+  .footer-links{flex-direction:column;gap:8px}
+}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="app-loader" id="app-loader" aria-label="A carregar Aldina Gest">
+  <div class="loader-card">
+    <img class="loader-logo" src="assets/aldina-gest-logo.png" alt="Aldina Gest">
+    <div class="loader-title">Sistema de Faturação e Gestão</div>
+    <div class="loader-bar"></div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-mark"><img src="assets/aldina-gest-logo.png" alt="Aldina Gest"></div>
+    <span class="nav-logo-text">Aldina Gest</span>
+  </a>
+  <div class="nav-links">
+    <a href="#funcionalidades">Funcionalidades</a>
+    <a href="#agt">AGT / Fiscal</a>
+    <a href="#precos">Preços</a>
+    <a href="#testemunhos">Clientes</a>
+  </div>
+  <div class="nav-right">
+    <button class="btn btn-ghost" onclick="openLogin()">Entrar</button>
+    <button class="btn btn-primary" onclick="openRegister()">Criar conta grátis →</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-badge"><span class="hero-badge-dot pulse"></span> Feito para Angola · Certificado AGT</div>
+  <h1 class="hero-title">Gerencie o seu negócio com <span>inteligência e simplicidade</span></h1>
+  <p class="hero-sub">O sistema de gestão e facturação mais completo de Angola. Facturas, clientes, stock, P&L e IA de crescimento — tudo num só lugar.</p>
+  <div class="hero-ctas">
+    <button class="btn btn-primary btn-lg" onclick="openRegister()">Experimentar 14 dias grátis</button>
+    <button class="btn btn-outline btn-lg" onclick="openLogin()">Já tenho conta</button>
+  </div>
+  <p class="hero-meta">Sem cartão de crédito · <strong>14 dias grátis</strong> · Cancele quando quiser</p>
+
+  <!-- MOCK SCREEN -->
+  <div class="hero-screen float" style="margin-top:52px">
+    <div class="hero-screen-frame">
+      <div class="hero-screen-bar">
+        <div class="dot" style="background:#ef4444"></div>
+        <div class="dot" style="background:#f59e0b"></div>
+        <div class="dot" style="background:#22c55e"></div>
+        <div style="flex:1;height:18px;background:rgba(255,255,255,.05);border-radius:4px;margin-left:8px"></div>
+      </div>
+      <div class="screen-inner">
+        <div class="mock-sidebar">
+          <div class="mock-logo"></div>
+          <div class="mock-nav active"></div>
+          <div class="mock-nav"></div>
+          <div class="mock-nav"></div>
+          <div class="mock-nav"></div>
+          <div class="mock-nav"></div>
+          <div class="mock-nav"></div>
+          <div class="mock-nav"></div>
+        </div>
+        <div class="mock-main">
+          <div class="mock-kpis">
+            <div class="mock-kpi"></div>
+            <div class="mock-kpi"></div>
+            <div class="mock-kpi"></div>
+            <div class="mock-kpi"></div>
+          </div>
+          <div class="mock-chart">
+            <div class="mock-bar" style="height:45%;background:rgba(108,99,255,.4)"></div>
+            <div class="mock-bar" style="height:60%;background:rgba(108,99,255,.5)"></div>
+            <div class="mock-bar" style="height:40%;background:rgba(108,99,255,.4)"></div>
+            <div class="mock-bar" style="height:75%;background:rgba(108,99,255,.6)"></div>
+            <div class="mock-bar" style="height:55%;background:rgba(108,99,255,.5)"></div>
+            <div class="mock-bar" style="height:85%;background:rgba(108,99,255,.7)"></div>
+            <div class="mock-bar" style="height:65%;background:rgba(108,99,255,.55)"></div>
+            <div class="mock-bar" style="height:90%;background:var(--accent)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAND -->
+<div class="stats-band">
+  <div><div class="stat-number" style="color:var(--accent2)">500+</div><div class="stat-label">Empresas registadas</div></div>
+  <div><div class="stat-number" style="color:var(--green)">120k+</div><div class="stat-label">Facturas emitidas</div></div>
+  <div><div class="stat-number" style="color:var(--amber)">18</div><div class="stat-label">Províncias de Angola</div></div>
+  <div><div class="stat-number" style="color:var(--text)">99.9%</div><div class="stat-label">Disponibilidade</div></div>
+</div>
+
+<!-- FUNCIONALIDADES -->
+<section id="funcionalidades">
+  <div style="text-align:center">
+    <div class="section-badge">✦ Funcionalidades</div>
+    <h2 class="section-title" style="margin:0 auto 14px">Tudo o que o seu negócio precisa</h2>
+    <p class="section-sub" style="margin:0 auto 48px">De freelancers a PMEs. Simples para começar, poderoso para crescer.</p>
+  </div>
+  <div class="features-grid">
+    <div class="feat-card">
+      <div class="feat-icon" style="background:rgba(108,99,255,.12)">◈</div>
+      <div class="feat-title">Facturação completa</div>
+      <div class="feat-desc">Emita facturas, proformas, facturas-recibo e notas de crédito em segundos. PDF automático, envio por e-mail.</div>
+      <span class="feat-tag" style="background:var(--accent3);color:var(--accent2)">ESSENCIAL</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:rgba(34,197,94,.1)">✦</div>
+      <div class="feat-title">IA de Crescimento</div>
+      <div class="feat-desc">Sugestões personalizadas para aumentar a receita: clientes a reactivar, margens a melhorar, previsões.</div>
+      <span class="feat-tag" style="background:linear-gradient(135deg,var(--accent3),rgba(167,139,250,.15));color:var(--accent2)">IA</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:rgba(245,158,11,.1)">↗</div>
+      <div class="feat-title">Lucro & Prejuízo (P&L)</div>
+      <div class="feat-desc">Demonstração de resultados em tempo real. Receita, custos, EBITDA, margem líquida e estimativa fiscal.</div>
+      <span class="feat-tag" style="background:var(--amber-bg);color:var(--amber)">FINANÇAS</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:rgba(59,130,246,.08)">❒</div>
+      <div class="feat-title">Clientes & Fornecedores</div>
+      <div class="feat-desc">Gestão completa da carteira com score de relacionamento, histórico e condições comerciais.</div>
+      <span class="feat-tag" style="background:rgba(59,130,246,.1);color:var(--blue)">CRM</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:rgba(20,184,166,.1)">▦</div>
+      <div class="feat-title">Stock & Inventário</div>
+      <div class="feat-desc">Controlo de stock em tempo real, alertas de reposição, movimentos e valorização do inventário.</div>
+      <span class="feat-tag" style="background:var(--green-bg);color:var(--green)">STOCK</span>
+    </div>
+    <div class="feat-card" style="border-color:rgba(34,197,94,.25);background:rgba(34,197,94,.03)">
+      <div class="feat-icon" style="background:var(--green-bg)">🏛</div>
+      <div class="feat-title">Facturação Electrónica AGT</div>
+      <div class="feat-desc">Preparado para integração com a Administração Geral Tributária, séries, assinatura digital, QR Code e impostos configuráveis.</div>
+      <span class="feat-tag" style="background:var(--green-bg);color:var(--green)">AGT ANGOLA</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:rgba(108,99,255,.12)">⊙</div>
+      <div class="feat-title">Multi-utilizador</div>
+      <div class="feat-desc">Adicione a sua equipa com funções e permissões personalizadas. Admin, operador e visualizador.</div>
+      <span class="feat-tag" style="background:var(--accent3);color:var(--accent2)">PME</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:rgba(245,158,11,.1)">💱</div>
+      <div class="feat-title">Multi-moeda</div>
+      <div class="feat-desc">Facturas em Kwanza, Dólar ou Euro. Câmbio automático e relatórios consolidados.</div>
+      <span class="feat-tag" style="background:var(--amber-bg);color:var(--amber)">ANGOLA</span>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:rgba(239,68,68,.08)">🔔</div>
+      <div class="feat-title">Notificações automáticas</div>
+      <div class="feat-desc">Lembretes de pagamento por e-mail, WhatsApp e SMS. Alertas de stock e facturas vencidas.</div>
+      <span class="feat-tag" style="background:var(--red-bg);color:var(--red)">AUTOMAÇÃO</span>
+    </div>
+  </div>
+</section>
+
+<!-- AGT SECTION -->
+<section id="agt" style="padding-top:0">
+  <div class="section-badge">🏛 Conformidade fiscal</div>
+  <h2 class="section-title">Preparado para integração com a AGT Angola</h2>
+  <p class="section-sub">Estrutura preparada para emissão fiscal, séries, assinatura digital e comunicação electrónica conforme a regulamentação aplicável.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div class="agt-block">
+      <div class="agt-icon-wrap">🧾</div>
+      <div class="agt-content">
+        <h3>Facturação Electrónica</h3>
+        <p>Preparação para comunicação com a API de Facturação Electrónica da AGT, incluindo numeração sequencial, séries autorizadas, assinatura digital JWS/RS256 e QR Code de consulta.</p>
+        <div class="agt-tags">
+          <span class="agt-tag">API AGT</span>
+          <span class="agt-tag">JWS RS256</span>
+          <span class="agt-tag">Séries</span>
+          <span class="agt-tag">QR Code</span>
+          <span class="agt-tag">IVA 14%</span>
+        </div>
+      </div>
+    </div>
+    <div class="agt-block">
+      <div class="agt-icon-wrap">📊</div>
+      <div class="agt-content">
+        <h3>Controlo fiscal e arquivo digital</h3>
+        <p>Acompanhamento do estado das facturas, histórico de processamento, mapas de IVA e exportações fiscais para apoio à contabilidade.</p>
+        <div class="agt-tags">
+          <span class="agt-tag">Estado da factura</span>
+          <span class="agt-tag">Arquivo digital</span>
+          <span class="agt-tag">Mapa de IVA</span>
+          <span class="agt-tag">Exportação fiscal</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PREÇOS -->
+<section id="precos" style="background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div style="text-align:center">
+    <div class="section-badge">💳 Preços</div>
+    <h2 class="section-title" style="margin:0 auto 14px">Licenças simples e transparentes</h2>
+    <p class="section-sub" style="margin:0 auto 48px">Escolha o período de acesso ao Aldina Gest. Todos os pacotes incluem <strong style="color:var(--accent2)">14 dias grátis</strong> sem cartão de crédito.</p>
+  </div>
+  <div class="pricing-grid">
+    <div class="price-card">
+      <div class="price-plan">Mensal</div>
+      <div class="price-amount">5.000 <span>Kz</span></div>
+      <div class="price-period">licença de 1 mês · 1 utilizador</div>
+      <div class="price-features">
+        <div class="price-feat"><span class="check">✓</span> Facturação completa</div>
+        <div class="price-feat"><span class="check">✓</span> Facturas e recibos</div>
+        <div class="price-feat"><span class="check">✓</span> Clientes & Fornecedores</div>
+        <div class="price-feat"><span class="check">✓</span> Stock e produtos</div>
+        <div class="price-feat"><span class="check">✓</span> PDF de facturas</div>
+        <div class="price-feat"><span class="check">✓</span> Dashboard financeiro</div>
+        <div class="price-feat"><span class="cross">✕</span> POS Venda</div>
+        <div class="price-feat"><span class="check">✓</span> Suporte básico</div>
+      </div>
+      <button class="btn btn-outline btn-full" onclick="openRegister()">Começar grátis</button>
+    </div>
+    <div class="price-card popular">
+      <div class="popular-badge">⭐ Mais popular</div>
+      <div class="price-plan" style="color:var(--accent2)">Semestral</div>
+      <div class="price-amount" style="color:var(--accent2)">30.000 <span>Kz</span></div>
+      <div class="price-period">licença de 6 meses · 1 utilizador</div>
+      <div class="price-features">
+        <div class="price-feat"><span class="check">✓</span> Tudo do Mensal</div>
+        <div class="price-feat"><span class="check">✓</span> Licença válida por 6 meses</div>
+        <div class="price-feat"><span class="check">✓</span> POS Venda liberado</div>
+        <div class="price-feat"><span class="check">✓</span> Melhor para uso contínuo</div>
+        <div class="price-feat"><span class="check">✓</span> Configuração inicial</div>
+        <div class="price-feat"><span class="check">✓</span> Relatórios de vendas</div>
+        <div class="price-feat"><span class="check">✓</span> Suporte prioritário</div>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="openRegister()">Começar grátis →</button>
+    </div>
+    <div class="price-card">
+      <div class="price-plan">Anual</div>
+      <div class="price-amount">60.000 <span>Kz</span></div>
+      <div class="price-period">licença de 1 ano · 1 utilizador</div>
+      <div class="price-features">
+        <div class="price-feat"><span class="check">✓</span> Tudo do Semestral</div>
+        <div class="price-feat"><span class="check">✓</span> Licença válida por 12 meses</div>
+        <div class="price-feat"><span class="check">✓</span> POS Venda liberado</div>
+        <div class="price-feat"><span class="check">✓</span> Renovação anual simples</div>
+        <div class="price-feat"><span class="check">✓</span> Formação de utilização</div>
+        <div class="price-feat"><span class="check">✓</span> Acompanhamento dedicado</div>
+        <div class="price-feat"><span class="check">✓</span> Suporte prioritário</div>
+      </div>
+      <button class="btn btn-outline btn-full" onclick="openRegister()">Começar grátis</button>
+    </div>
+  </div>
+  <div class="payment-box">
+    <div class="payment-head">
+      <div>
+        <div class="payment-title">Pagamento por transferência bancária</div>
+        <div class="payment-sub">Após o pagamento, envie o comprovativo por e-mail para confirmação da licença.</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <a class="whatsapp-link" href="mailto:aldinagest@gmail.com?subject=Comprovativo%20de%20pagamento%20Aldina%20Gest">aldinagest@gmail.com</a>
+        <a class="whatsapp-link" href="https://wa.me/244941969334" target="_blank" rel="noopener">WhatsApp: 941 969 334</a>
+      </div>
+    </div>
+    <div class="payment-grid">
+      <div class="bank-card">
+        <div class="bank-name">BFA</div>
+        <div class="bank-iban">IBAN: 0006 0000 08326835301 94</div>
+        <div class="bank-holder">Titular: Abel Kunhaki Nicolau João</div>
+      </div>
+      <div class="bank-card">
+        <div class="bank-name">BCI</div>
+        <div class="bank-iban">IBAN: 0005 0000 75082948101 97</div>
+        <div class="bank-holder">Titular: Abel Kunhaki Nicolau João</div>
+      </div>
+      <div class="bank-card">
+        <div class="bank-name">BIC</div>
+        <div class="bank-iban">IBAN: 0051 0000 36411881101 41</div>
+        <div class="bank-holder">Titular: Abel Kunhaki Nicolau João</div>
+      </div>
+    </div>
+  </div>
+  <p class="trial-note">Todos os pacotes incluem <strong>14 dias de experimentação gratuita</strong>. Sem compromisso, sem cartão de crédito.</p>
+</section>
+
+<!-- TESTEMUNHOS -->
+<section id="testemunhos">
+  <div style="text-align:center">
+    <div class="section-badge">💬 Testemunhos</div>
+    <h2 class="section-title" style="margin:0 auto 14px">O que dizem os nossos clientes</h2>
+    <p class="section-sub" style="margin:0 auto 48px">Empresas de todo o Angola confiam no Aldina Gest.</p>
+  </div>
+  <div class="testi-grid">
+    <div class="testi-card">
+      <div class="testi-stars">★★★★★</div>
+      <p class="testi-text">"O Aldina Gest transformou a gestão da nossa empresa. Antes levávamos horas com Excel, agora em minutos temos tudo pronto para a AGT."</p>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:#6c63ff">CM</div>
+        <div><div class="testi-name">Carlos Mendes</div><div class="testi-co">CEO · TechSolve Lda, Luanda</div></div>
+      </div>
+    </div>
+    <div class="testi-card" style="border-color:var(--border2)">
+      <div class="testi-stars">★★★★★</div>
+      <p class="testi-text">"A funcionalidade de facturação electrónica com a AGT é exactamente o que precisávamos. Simples, rápido e legal. Recomendo a qualquer PME angolana."</p>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:#14b8a6">AS</div>
+        <div><div class="testi-name">Ana Sofia Lopes</div><div class="testi-co">Directora Financeira · Mercantel SA</div></div>
+      </div>
+    </div>
+    <div class="testi-card">
+      <div class="testi-stars">★★★★★</div>
+      <p class="testi-text">"A IA de crescimento já nos sugeriu 3 acções que aumentaram o faturamento em 22% em dois meses. Isso é o futuro da gestão empresarial em Angola."</p>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:#f59e0b">PR</div>
+        <div><div class="testi-name">Pedro Rodrigues</div><div class="testi-co">Fundador · Agroplus Lda, Huambo</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<div class="cta-final">
+  <h2>Pronto para transformar<br>a gestão do seu negócio?</h2>
+  <p>Junte-se a mais de 500 empresas angolanas que já usam o Aldina Gest.</p>
+  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+    <button class="btn btn-primary btn-lg" onclick="openRegister()">Criar conta grátis — 14 dias</button>
+    <button class="btn btn-outline btn-lg" onclick="openLogin()">Já tenho conta</button>
+  </div>
+  <p style="font-size:12px;color:var(--text3);margin-top:16px">Sem cartão · Sem compromisso · Cancele quando quiser</p>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">
+    <div class="nav-logo-mark"><img src="assets/aldina-gest-logo.png" alt="Aldina Gest"></div>
+    <span>Aldina Gest</span>
+  </div>
+  <div class="footer-links">
+    <a href="#funcionalidades">Funcionalidades</a>
+    <a href="#precos">Preços</a>
+    <a href="#">Suporte</a>
+    <a href="#">Política de privacidade</a>
+    <a href="#">Termos de uso</a>
+  </div>
+  <div class="footer-copy">© 2026 Aldina Gest · Desenvolvido por Abel Kunhaki Nicolau João · Luanda, Angola</div>
+</footer>
+
+<!-- ===== MODAL LOGIN ===== -->
+<div class="modal-overlay" id="modal-login" onclick="closeModalBg(event,'modal-login')">
+  <div class="auth-modal">
+    <div class="auth-logo">
+      <img class="auth-logo-img" src="assets/aldina-gest-logo.png" alt="Aldina Gest">
+    </div>
+    <h2 class="auth-title">Bem-vindo de volta</h2>
+    <p class="auth-sub">Aceda à sua conta para continuar</p>
+    <div class="form-group">
+      <label class="form-label" for="login-email">E-mail</label>
+      <input class="form-input" id="login-email" type="email" placeholder="email@empresa.ao" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="login-pass">Palavra-passe</label>
+      <input class="form-input" id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div style="text-align:right;margin-bottom:14px"><a onclick="openReset()" style="font-size:12px;color:var(--accent2);cursor:pointer">Esqueci a palavra-passe</a></div>
+    <button class="btn btn-primary btn-full" onclick="doLogin()">Entrar na conta →</button>
+    <div class="divider">ou</div>
+    <div class="auth-switch">Não tem conta? <a onclick="switchToRegister()">Criar conta grátis</a></div>
+    <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--text3)">
+      Demo rápida: email qualquer + senha qualquer
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL REGISTO ===== -->
+<div class="modal-overlay" id="modal-register" onclick="closeModalBg(event,'modal-register')">
+  <div class="auth-modal">
+    <div class="auth-logo">
+      <img class="auth-logo-img" src="assets/aldina-gest-logo.png" alt="Aldina Gest">
+    </div>
+    <h2 class="auth-title">Criar conta gratuita</h2>
+    <div class="trial-banner">🎉 <strong>14 dias grátis</strong> — sem cartão de crédito necessário</div>
+    <div class="form-group">
+      <label class="form-label" for="reg-nome">Nome completo</label>
+      <input class="form-input" id="reg-nome" placeholder="O seu nome" autocomplete="name">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="reg-empresa">Nome da empresa</label>
+      <input class="form-input" id="reg-empresa" placeholder="Ex: Mercantel Lda" autocomplete="organization">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="reg-email">E-mail empresarial</label>
+      <input class="form-input" id="reg-email" type="email" placeholder="email@empresa.ao" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="reg-pass">Palavra-passe</label>
+      <input class="form-input" id="reg-pass" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="reg-plano">Plano inicial</label>
+      <select class="form-input" id="reg-plano" style="cursor:pointer">
+        <option value="mensal">Mensal — 5.000 Kz / 1 mês</option>
+        <option value="semestral" selected>Semestral — 30.000 Kz / 6 meses ⭐</option>
+        <option value="anual">Anual — 60.000 Kz / 1 ano</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="doRegister()">Criar conta e começar →</button>
+    <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:12px">Ao criar conta concorda com os <a style="color:var(--accent2)">Termos de Uso</a> e <a style="color:var(--accent2)">Política de Privacidade</a></p>
+    <div class="auth-switch">Já tem conta? <a onclick="switchToLogin()">Iniciar sessão</a></div>
+  </div>
+</div>
+
+<!-- ===== MODAL RECUPERAR SENHA ===== -->
+<div class="modal-overlay" id="modal-reset" onclick="closeModalBg(event,'modal-reset')">
+  <div class="auth-modal">
+    <div class="auth-logo">
+      <img class="auth-logo-img" src="assets/aldina-gest-logo.png" alt="Aldina Gest">
+    </div>
+    <h2 class="auth-title">Recuperar palavra-passe</h2>
+    <p class="auth-sub">Informe o e-mail da conta. O pedido será enviado para suporte por e-mail.</p>
+    <div class="form-group">
+      <label class="form-label" for="reset-email">E-mail da conta</label>
+      <input class="form-input" id="reset-email" type="email" placeholder="email@empresa.ao" autocomplete="email">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="requestPasswordReset()">Enviar pedido por e-mail →</button>
+    <div class="auth-switch">Lembrou a senha? <a onclick="switchToLoginFromReset()">Iniciar sessão</a></div>
+    <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--text3)">
+      Suporte: aldinagest@gmail.com
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"><span id="toast-icon">✓</span> <span id="toast-msg">—</span></div>
+
+<script>
+window.addEventListener('load',()=>{
+  setTimeout(()=>document.getElementById('app-loader')?.classList.add('hide'),450);
+});
+
+let supabaseClient = null;
+function getSupabaseClient(){
+  const cfg = window.ALDINA_SUPABASE || {};
+  if(!cfg.url || !cfg.anonKey || !window.supabase) return null;
+  if(!supabaseClient) supabaseClient = window.supabase.createClient(cfg.url, cfg.anonKey);
+  return supabaseClient;
+}
+
+async function saveProfileOnline(userId, account){
+  const sb = getSupabaseClient();
+  if(!sb || !userId) return;
+  const payload = {
+    id:userId,
+    email:account.email,
+    nome:account.nome,
+    empresa:account.empresa,
+    role:account.email?.toLowerCase()==='aldinagest@gmail.com'?'admin':'client',
+    plano:account.plano || 'semestral',
+    status:account.status || 'trial',
+    trial_end:account.trialEnd ? new Date(account.trialEnd).toISOString() : null,
+    license_start:account.licenseStart ? new Date(account.licenseStart).toISOString() : null,
+    license_end:account.licenseEnd ? new Date(account.licenseEnd).toISOString() : null,
+    updated_at:new Date().toISOString()
+  };
+  await sb.from('profiles').upsert(payload, { onConflict:'id' });
+}
+
+function openLogin(){ document.getElementById('modal-login').classList.add('open'); }
+function openRegister(){ document.getElementById('modal-register').classList.add('open'); }
+function openReset(){
+  const email=document.getElementById('login-email')?.value.trim()||'';
+  document.getElementById('modal-login').classList.remove('open');
+  document.getElementById('modal-reset').classList.add('open');
+  if(email) document.getElementById('reset-email').value=email;
+}
+function switchToRegister(){ document.getElementById('modal-login').classList.remove('open'); openRegister(); }
+function switchToLogin(){ document.getElementById('modal-register').classList.remove('open'); openLogin(); }
+function switchToLoginFromReset(){ document.getElementById('modal-reset').classList.remove('open'); openLogin(); }
+function closeModalBg(e,id){ if(e.target===document.getElementById(id)) document.getElementById(id).classList.remove('open'); }
+
+function toast(msg, type='success'){
+  const t=document.getElementById('toast');
+  document.getElementById('toast-msg').textContent=msg;
+  t.className='toast '+type+' show';
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  if(!email||!pass){ toast('Preencha e-mail e palavra-passe','error'); return; }
+  const sb = getSupabaseClient();
+  if(sb){
+    const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
+    if(error){ toast(error.message || 'Não foi possível iniciar sessão','error'); return; }
+    const { data:profileData } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
+    const profile = profileData || {};
+    const account = {
+      nome:profile.nome || data.user.user_metadata?.nome || email,
+      empresa:profile.empresa || data.user.user_metadata?.empresa || '',
+      email,
+      plano:profile.plano || 'semestral',
+      status:profile.status || 'trial',
+      trialEnd:profile.trial_end ? new Date(profile.trial_end).getTime() : Date.now()+14*24*60*60*1000,
+      licenseStart:profile.license_start ? new Date(profile.license_start).getTime() : null,
+      licenseEnd:profile.license_end ? new Date(profile.license_end).getTime() : null,
+      createdAt:profile.created_at ? new Date(profile.created_at).getTime() : Date.now()
+    };
+    localStorage.setItem('ag_account', JSON.stringify(account));
+    localStorage.setItem('ag_session', JSON.stringify({email, userId:data.user.id, loggedAt: Date.now(), provider:'supabase'}));
+    toast('A entrar no sistema...');
+    setTimeout(()=>{ window.location.href='/app'; }, 800);
+    return;
+  }
+  if(email.toLowerCase()==='aldinagest@gmail.com'){
+    localStorage.setItem('ag_account', JSON.stringify({
+      nome:'Abel Kunhaki Nicolau João',
+      empresa:'Aldina Gest',
+      email,
+      plano:'anual',
+      status:'active',
+      licenseStart:Date.now(),
+      licenseEnd:Date.now()+365*24*60*60*1000,
+      createdAt:Date.now()
+    }));
+  }
+  // Guardar sessão
+  if(email.toLowerCase()!=='aldinagest@gmail.com') localStorage.removeItem('ag_account');
+  localStorage.setItem('ag_session', JSON.stringify({email, loggedAt: Date.now()}));
+  toast('A entrar no sistema...');
+  setTimeout(()=>{ window.location.href='/app'; }, 1000);
+}
+
+async function requestPasswordReset(){
+  const email=document.getElementById('reset-email').value.trim();
+  if(!email){ toast('Informe o e-mail da conta','error'); return; }
+  const sb = getSupabaseClient();
+  if(sb){
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/index.html' });
+    if(error){ toast(error.message || 'Não foi possível enviar recuperação','error'); return; }
+    toast('E-mail de recuperação enviado. Verifique a caixa de entrada.');
+    return;
+  }
+  const subject=encodeURIComponent('Recuperação de palavra-passe - Aldina Gest');
+  const body=encodeURIComponent(
+    `Olá,\n\nSolicito recuperação de palavra-passe da conta Aldina Gest.\n\nE-mail da conta: ${email}\nData do pedido: ${new Date().toLocaleString('pt-AO')}\n\nObrigado.`
+  );
+  window.location.href=`mailto:aldinagest@gmail.com?subject=${subject}&body=${body}`;
+  toast('Pedido preparado por e-mail. Envie a mensagem para o suporte.');
+}
+
+async function doRegister(){
+  const nome=document.getElementById('reg-nome').value.trim();
+  const empresa=document.getElementById('reg-empresa').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const pass=document.getElementById('reg-pass').value;
+  const plano=document.getElementById('reg-plano').value;
+  if(!nome||!empresa||!email||!pass){ toast('Preencha todos os campos','error'); return; }
+  if(pass.length<8){ toast('A palavra-passe deve ter pelo menos 8 caracteres','error'); return; }
+  // Guardar conta e trial
+  const trialEnd = Date.now() + 14*24*60*60*1000;
+  const account = { nome, empresa, email, plano, trialEnd, createdAt: Date.now(), status:'trial' };
+  const sb = getSupabaseClient();
+  if(sb){
+    const { data, error } = await sb.auth.signUp({ password:pass, email, options:{ data:{ nome, empresa } } });
+    if(error){ toast(error.message || 'Não foi possível criar a conta','error'); return; }
+    if(data.user) await saveProfileOnline(data.user.id, account);
+    localStorage.setItem('ag_session', JSON.stringify({email, userId:data.user?.id, loggedAt: Date.now(), provider:'supabase'}));
+  }
+  localStorage.setItem('ag_account', JSON.stringify(account));
+  if(!sb) localStorage.setItem('ag_session', JSON.stringify({email, loggedAt: Date.now()}));
+  // Pre-fill config no sistema
+  const cfg = {
+    empresa, comercial:empresa, nif:'', tel:'', addr:'Luanda, Angola', local:'Luanda', pais:'Angola',
+    email, web:'', banco:'', iban:'', moeda:'Kz (Kwanza)', iva:'14%', prazo:30, prefix:'FT',
+    emissao:'Luanda', regime:'Regime Geral de IVA', nota:'Obrigado pela preferência.',
+    condicoes:'Pagamento por transferência, multicaixa ou numerário.', logo:''
+  };
+  localStorage.setItem('fp_config', JSON.stringify(cfg));
+  toast('Conta criada! A entrar no sistema...');
+  setTimeout(()=>{ window.location.href='/app'; }, 1200);
+}
+
+// Smooth scroll for nav links
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{ e.preventDefault(); const el=document.querySelector(a.getAttribute('href')); if(el) el.scrollIntoView({behavior:'smooth'}); });
+});
+
+// Nav scroll effect
+window.addEventListener('scroll',()=>{
+  const nav=document.querySelector('nav');
+  nav.style.background=window.scrollY>20?'rgba(10,10,14,0.95)':'rgba(10,10,14,0.85)';
+});
+</script>
+</body>
+</html>
