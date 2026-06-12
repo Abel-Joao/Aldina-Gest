@@ -818,16 +818,12 @@ tbody tr:last-child td{border-bottom:none}
         <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
           <div style="display:flex;flex-direction:column;gap:8px">
             <div id="plano-mensal" class="plano-opt" onclick="selectPlano('mensal')" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--rsm);padding:14px;cursor:pointer;transition:all .15s">
-              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">Mensal</span><span style="font-family:var(--mono);color:var(--text2)">5.000 Kz</span></div>
-              <div style="font-size:12px;color:var(--text3);margin-top:3px">1 mês · 1 utilizador · sem POS Venda</div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">Mensal</span><span style="font-family:var(--mono);color:var(--text2)">4.000 Kz</span></div>
+              <div style="font-size:12px;color:var(--text3);margin-top:3px">1 mês · 1 utilizador · renovação mensal</div>
             </div>
-            <div id="plano-semestral" class="plano-opt" onclick="selectPlano('semestral')" style="background:var(--accent3);border:1px solid var(--accent);border-radius:var(--rsm);padding:14px;cursor:pointer;transition:all .15s">
-              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600;color:var(--accent2)">Semestral ⭐</span><span style="font-family:var(--mono);color:var(--accent2)">30.000 Kz</span></div>
-              <div style="font-size:12px;color:var(--text3);margin-top:3px">6 meses · 1 utilizador · POS Venda liberado</div>
-            </div>
-            <div id="plano-anual" class="plano-opt" onclick="selectPlano('anual')" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--rsm);padding:14px;cursor:pointer;transition:all .15s">
-              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">Anual</span><span style="font-family:var(--mono);color:var(--text2)">60.000 Kz</span></div>
-              <div style="font-size:12px;color:var(--text3);margin-top:3px">1 ano · 1 utilizador · POS Venda liberado</div>
+            <div id="plano-anual" class="plano-opt" onclick="selectPlano('anual')" style="background:var(--accent3);border:1px solid var(--accent);border-radius:var(--rsm);padding:14px;cursor:pointer;transition:all .15s">
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600;color:var(--accent2)">Anual ⭐</span><span style="font-family:var(--mono);color:var(--accent2)">44.000 Kz</span></div>
+              <div style="font-size:12px;color:var(--text3);margin-top:3px">12 meses · até 3 utilizadores · WhatsApp AI · paga 11, usa 12</div>
             </div>
           </div>
           <div class="section-sep">Pagamento</div>
@@ -847,7 +843,14 @@ tbody tr:last-child td{border-bottom:none}
             <div class="form-group"><label class="form-label">Referência / Comprovativo</label><input class="form-input" id="pay-ref" placeholder="Nº transferência"></div>
           </div>
           <button class="btn btn-primary" onclick="renovarLicenca()">✓ Confirmar pagamento e renovar</button>
-          <div style="font-size:11px;color:var(--text3);text-align:center">Após confirmação do pagamento a licença é activada em até 2 horas</div>
+          <div style="font-size:11px;color:var(--text3);text-align:center">Após confirmação do pagamento receberá um código de licença por e-mail.</div>
+          <div class="section-sep">Activar com código</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Recebeu um código por e-mail? Cole aqui para activar imediatamente.</div>
+          <div style="display:flex;gap:8px">
+            <input id="codigo-licenca-cfg-input" class="form-input" placeholder="ALDINA-XXXX-XXXX-XXXX" style="flex:1;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+            <button class="btn btn-primary" onclick="activarCodigoLicenca('cfg')" style="white-space:nowrap">🔑 Activar</button>
+          </div>
+          <div id="codigo-licenca-cfg-feedback" style="font-size:12px;margin-top:6px;display:none"></div>
         </div>
       </div>
     </div>
@@ -3232,23 +3235,114 @@ function checkSession(){
 }
 
 function showTrialWarning(days){
+  if(document.getElementById('trial-warning-banner')) return;
   const banner = document.createElement('div');
-  banner.innerHTML = `<div style="background:var(--amber-bg);border-bottom:1px solid rgba(245,158,11,.3);padding:10px 24px;font-size:12px;color:var(--amber);display:flex;align-items:center;justify-content:space-between">
-    <span>⏳ <strong>Trial expira em ${days} dia(s).</strong> Renove a sua licença para não perder o acesso.</span>
-    <button class="btn btn-amber btn-sm" onclick="nav('config');cfgTab(document.getElementById('cfg-tab-licenca-btn'),'licenca')">Renovar agora</button>
+  banner.id = 'trial-warning-banner';
+  const color = days <= 1 ? 'var(--red)' : days <= 3 ? 'var(--amber)' : 'var(--amber)';
+  const bg = days <= 1 ? 'rgba(239,68,68,.1)' : 'var(--amber-bg)';
+  const border = days <= 1 ? 'rgba(239,68,68,.3)' : 'rgba(245,158,11,.3)';
+  banner.innerHTML = `<div style="background:${bg};border-bottom:1px solid ${border};padding:10px 24px;font-size:12px;color:${color};display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <span>⏳ <strong>Trial expira em ${days} dia${days===1?'':'s'}.</strong> Active a sua licença para não perder o acesso.</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-sm" style="background:${color};color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer" onclick="mostrarActivarCodigo()">🔑 Tenho código</button>
+      <button class="btn btn-ghost btn-sm" onclick="nav('config');cfgTab(document.getElementById('cfg-tab-licenca-btn'),'licenca')" style="font-size:11px">Renovar</button>
+    </div>
   </div>`;
   document.querySelector('.main').insertBefore(banner, document.querySelector('.topbar'));
 }
 
 function showTrialExpired(){
   document.querySelector('.main').innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px;text-align:center">
-      <div style="font-size:48px;margin-bottom:20px">🔒</div>
-      <div style="font-size:24px;font-weight:700;margin-bottom:10px">Trial expirado</div>
-      <div style="font-size:14px;color:var(--text2);max-width:400px;margin-bottom:28px">O seu período de 14 dias de avaliação terminou. Renove a licença para continuar a usar o Aldina Gest.</div>
-      <button class="btn btn-primary" onclick="nav('config');document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-config').classList.add('active')">🔑 Renovar licença</button>
-      <button class="btn btn-ghost" style="margin-top:10px" onclick="logout()">Terminar sessão</button>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 20px;text-align:center;background:var(--bg)">
+      <div style="max-width:480px;width:100%">
+        <div style="font-size:56px;margin-bottom:20px">🔒</div>
+        <div style="font-size:26px;font-weight:700;margin-bottom:10px;letter-spacing:-.3px">Período de trial terminou</div>
+        <div style="font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.7">Os seus 14 dias de avaliação gratuita terminaram.<br>Active a sua licença para continuar a usar o Aldina Gest.</div>
+
+        <!-- Campo de código -->
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:24px;margin-bottom:16px;text-align:left">
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px">🔑 Já tem código de licença?</div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Recebeu um código por e-mail após o pagamento. Cole aqui para activar.</div>
+          <div style="display:flex;gap:8px">
+            <input id="codigo-licenca-input" class="form-input" placeholder="ALDINA-XXXX-XXXX-XXXX" style="flex:1;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+            <button class="btn btn-primary" onclick="activarCodigoLicenca()" style="white-space:nowrap;padding:10px 18px">Activar</button>
+          </div>
+          <div id="codigo-feedback" style="margin-top:10px;font-size:12px;display:none"></div>
+        </div>
+
+        <!-- Pagar -->
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:16px;text-align:left">
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px">💳 Ainda não pagou?</div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Escolha um plano e pague por transferência ou Multicaixa Express.</div>
+          <div style="display:flex;gap:10px;margin-bottom:14px">
+            <div id="blk-plan-mensal" onclick="blkSelectPlan('mensal')" style="flex:1;border:2px solid var(--accent);background:var(--accent3);border-radius:10px;padding:12px;cursor:pointer;text-align:center">
+              <div style="font-size:13px;font-weight:700">Mensal</div>
+              <div style="font-size:18px;font-weight:700;color:var(--accent2);margin:4px 0">4.000 Kz</div>
+              <div style="font-size:11px;color:var(--text3)">por mês</div>
+            </div>
+            <div id="blk-plan-anual" onclick="blkSelectPlan('anual')" style="flex:1;border:1px solid var(--border);background:var(--bg3);border-radius:10px;padding:12px;cursor:pointer;text-align:center">
+              <div style="font-size:13px;font-weight:700">Anual</div>
+              <div style="font-size:18px;font-weight:700;color:var(--text);margin:4px 0">44.000 Kz</div>
+              <div style="font-size:11px;color:var(--green)">paga 11, usa 12</div>
+            </div>
+          </div>
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;color:var(--text2);margin-bottom:12px">
+            <div style="font-weight:600;color:var(--text);margin-bottom:6px">Transferência bancária</div>
+            <div>BFA · <span style="font-family:var(--mono);color:var(--text)">0006 0000 08326835301 94</span></div>
+            <div>BCI · <span style="font-family:var(--mono);color:var(--text)">0005 0000 75082948101 97</span></div>
+            <div>BIC · <span style="font-family:var(--mono);color:var(--text)">0051 0000 36411881101 41</span></div>
+            <div style="margin-top:6px">Titular: <strong style="color:var(--text)">Abel Kunhaki Nicolau João</strong></div>
+            <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📱 Multicaixa Express: <strong style="color:var(--amber)">941 969 334</strong></div>
+          </div>
+          <a id="blk-whatsapp-btn" href="#" onclick="blkAbrirWhatsApp(event)" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;border-radius:9px;background:var(--green);color:#fff;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer;font-family:var(--font)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            Já paguei — Enviar comprovativo
+          </a>
+        </div>
+
+        <button class="btn btn-ghost" style="width:100%;margin-top:4px" onclick="logout()">Terminar sessão</button>
+      </div>
     </div>`;
+  window._blkPlan = 'mensal';
+}
+
+function blkSelectPlan(p){
+  window._blkPlan = p;
+  ['mensal','anual'].forEach(x=>{
+    const el=document.getElementById('blk-plan-'+x);
+    if(!el) return;
+    if(x===p){ el.style.border='2px solid var(--accent)'; el.style.background='var(--accent3)'; }
+    else { el.style.border='1px solid var(--border)'; el.style.background='var(--bg3)'; }
+  });
+}
+
+function blkAbrirWhatsApp(e){
+  e.preventDefault();
+  const plano = window._blkPlan==='anual' ? 'Anual (44.000 Kz)' : 'Mensal (4.000 Kz)';
+  const account = JSON.parse(localStorage.getItem('ag_account')||'{}');
+  const msg = encodeURIComponent('Olá! Acabei de efectuar o pagamento do Aldina Gest.\n\nPlano: '+plano+'\nE-mail da conta: '+(account.email||'—')+'\n\nSeguem em anexo os dados do comprovativo. Por favor activem a minha licença. Obrigado!');
+  window.open('https://wa.me/244941969334?text='+msg,'_blank');
+}
+
+function mostrarActivarCodigo(){
+  // Scroll para config → licença se na app, ou mostrar modal
+  const input = document.getElementById('codigo-licenca-cfg-input');
+  if(input){ nav('config'); cfgTab(document.getElementById('cfg-tab-licenca-btn'),'licenca'); setTimeout(()=>input.focus(),300); return; }
+  // fallback — criar modal rápido
+  const m = document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  m.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:28px;max-width:400px;width:100%">
+    <div style="font-size:16px;font-weight:700;margin-bottom:8px">🔑 Activar licença</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:16px">Cole o código que recebeu por e-mail após o pagamento.</div>
+    <input id="modal-codigo-input" class="form-input" placeholder="ALDINA-XXXX-XXXX-XXXX" style="font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px" oninput="this.value=this.value.toUpperCase()">
+    <div id="modal-codigo-feedback" style="font-size:12px;margin-bottom:12px;display:none"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="activarCodigoLicenca('modal')">Activar</button>
+      <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  setTimeout(()=>document.getElementById('modal-codigo-input')?.focus(),100);
 }
 
 async function logout(){
@@ -3481,6 +3575,75 @@ function selectPlano(p){
   document.querySelectorAll('.plano-opt').forEach(el=>{ el.style.background='var(--bg3)'; el.style.borderColor='var(--border)'; });
   const el=document.getElementById('plano-'+p);
   if(el){ el.style.background='var(--accent3)'; el.style.borderColor='var(--accent)'; }
+}
+
+async function activarCodigoLicenca(source){
+  const inputId = source==='modal' ? 'modal-codigo-input' : (source==='cfg' ? 'codigo-licenca-cfg-input' : 'codigo-licenca-input');
+  const feedbackId = source==='modal' ? 'modal-codigo-feedback' : (source==='cfg' ? 'codigo-licenca-cfg-feedback' : 'codigo-feedback');
+  const codigo = (document.getElementById(inputId)?.value||'').trim().toUpperCase();
+  const fb = document.getElementById(feedbackId);
+  if(!codigo){ if(fb){fb.style.display='block';fb.style.color='var(--red)';fb.textContent='Introduza o código de licença.';} return; }
+  if(fb){fb.style.display='block';fb.style.color='var(--text3)';fb.textContent='A verificar código...';}
+
+  const cfg = window.ALDINA_SUPABASE||{};
+  const base = _sbEffectiveUrl(cfg);
+  const token = await getValidSBToken();
+  const account = JSON.parse(localStorage.getItem('ag_account')||'{}');
+
+  if(!base||!token){
+    if(fb){fb.style.color='var(--red)';fb.textContent='Sem ligação ao servidor. Verifique a sua ligação.';}
+    return;
+  }
+  try{
+    // Verificar código na tabela license_codes
+    const res = await fetch(base+'/rest/v1/license_codes?code=eq.'+encodeURIComponent(codigo)+'&select=*&limit=1',{
+      headers:{'apikey':cfg.anonKey,'Authorization':'Bearer '+token,'Accept':'application/json'}
+    });
+    const arr = res.ok ? await res.json() : [];
+    const lc = Array.isArray(arr) ? arr[0] : null;
+
+    if(!lc){ if(fb){fb.style.color='var(--red)';fb.textContent='❌ Código inválido ou não encontrado.';}  return; }
+    if(lc.used){ if(fb){fb.style.color='var(--red)';fb.textContent='❌ Este código já foi utilizado.';}  return; }
+    if(lc.expires_at && new Date(lc.expires_at)<new Date()){ if(fb){fb.style.color='var(--red)';fb.textContent='❌ Este código expirou.';}  return; }
+
+    // Marcar código como usado
+    await fetch(base+'/rest/v1/license_codes?code=eq.'+encodeURIComponent(codigo),{
+      method:'PATCH',
+      headers:{'apikey':cfg.anonKey,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({used:true, used_by:account.email||'', used_at:new Date().toISOString()})
+    });
+
+    // Calcular nova data de fim
+    const plano = lc.plano || 'mensal';
+    const dias = plano==='anual' ? 365 : 30;
+    const now = Date.now();
+    const licenseEnd = now + dias*24*60*60*1000;
+
+    // Actualizar perfil no Supabase
+    const emailParam = encodeURIComponent((account.email||'').toLowerCase());
+    await fetch(base+'/rest/v1/profiles?email=eq.'+emailParam,{
+      method:'PATCH',
+      headers:{'apikey':cfg.anonKey,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'active', plano, license_start:new Date(now).toISOString(), license_end:new Date(licenseEnd).toISOString(), updated_at:new Date().toISOString()})
+    });
+
+    // Actualizar localStorage
+    account.status = 'active';
+    account.plano = plano;
+    account.licenseStart = now;
+    account.licenseEnd = licenseEnd;
+    account.trialEnd = licenseEnd;
+    delete account.pendingPlan;
+    delete account.pendingPaymentRef;
+    localStorage.setItem('ag_account', JSON.stringify(account));
+
+    if(fb){fb.style.color='var(--green)';fb.textContent='✓ Licença activada com sucesso! A recarregar...';}
+    toast('🎉 Licença '+plano+' activada! Bem-vindo ao Aldina Gest.','success');
+    setTimeout(()=>{ location.reload(); }, 1800);
+  }catch(e){
+    if(fb){fb.style.color='var(--red)';fb.textContent='Erro: '+e.message;}
+    console.error('activar licença:', e);
+  }
 }
 
 async function renovarLicenca(){
