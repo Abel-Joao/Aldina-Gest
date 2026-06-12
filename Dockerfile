@@ -28,7 +28,7 @@ COPY --from=base /app/packages/web/dist ./packages/web/dist
 COPY --from=base /app/packages/web/src ./packages/web/src
 COPY --from=base /app/packages/web/package.json ./packages/web/package.json
 COPY --from=base /app/node_modules ./node_modules
-COPY --from=base /app/packages/web/node_modules ./packages/web/node_modules 2>/dev/null || true
+RUN mkdir -p ./packages/web/node_modules
 
 EXPOSE 3000
 
