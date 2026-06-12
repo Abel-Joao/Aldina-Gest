@@ -2070,15 +2070,22 @@ function openCaixaModal(mode){
   document.getElementById('ov-caixa').classList.add('open');
 }
 
-function confirmCaixa(){
+async function confirmCaixa(){
   const valor=Number(document.getElementById('caixa-valor').value||0);
   const obs=document.getElementById('caixa-obs').value.trim();
   if(valor<0){ toast('Informe um valor válido','error'); return; }
+  const userId = getAuthUserId();
   if(caixaMode==='open'){
     const now=new Date().toISOString();
     caixaAtual={id:uid(),status:'open',openedAt:now,operador:operadorAtual(),valorInicial:valor,vendas:0,numVendas:0,pagamentos:{Dinheiro:0,Multicaixa:0,Transferência:0,Crédito:0},obsOpen:obs};
-    caixa.unshift({id:uid(),caixaId:caixaAtual.id,tipo:'abertura',ref:'Caixa aberta',pagamento:'Dinheiro',valor,data:now,estado:'Aberta'});
+    const mov={id:uid(),caixaId:caixaAtual.id,tipo:'abertura',ref:'Caixa aberta',pagamento:'Dinheiro',valor,data:now,estado:'Aberta'};
+    caixa.unshift(mov);
     save(); closePanel('ov-caixa'); toast('Caixa aberta ✓'); renderPOS();
+    // Sync Supabase
+    try{
+      const rec={ id: caixaAtual.id, user_id: userId, data: now.slice(0,10), abertura: valor, status: 'aberta', notas: obs, updated_at: now };
+      await sbSyncRecord('caixa', rec);
+    }catch(e){ console.warn('Supabase caixa sync:', e); }
     return;
   }
   if(!caixaAberta()){ toast('Não há caixa aberta','error'); return; }
@@ -2086,7 +2093,21 @@ function confirmCaixa(){
   const esperado=caixaEsperado();
   const diferenca=valor-esperado;
   const estado=Math.abs(diferenca)<0.01?'Certo':diferenca>0?'Sobra':'Falta';
-  caixa.unshift({id:uid(),caixaId:caixaAtual.id,tipo:'fecho',ref:`${caixaAtual.numVendas||0} venda(s)`,pagamento:'Dinheiro',valor,data:now,estado,totalVendas:caixaAtual.vendas||0,diferenca,obs});
+  const mov={id:uid(),caixaId:caixaAtual.id,tipo:'fecho',ref:`${caixaAtual.numVendas||0} venda(s)`,pagamento:'Dinheiro',valor,data:now,estado,totalVendas:caixaAtual.vendas||0,diferenca,obs};
+  caixa.unshift(mov);
+  // Sync fecho no Supabase
+  try{
+    const cfg = window.ALDINA_SUPABASE || {};
+    const base = _sbEffectiveUrl(cfg);
+    const token = await getValidSBToken();
+    if(base && token){
+      await fetch(base+'/rest/v1/caixa?id=eq.'+caixaAtual.id, {
+        method:'PATCH',
+        headers:{'apikey':cfg.anonKey,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({ fechamento: valor, status: 'fechada', totalVendas: caixaAtual.vendas||0, notas: obs, updated_at: now })
+      });
+    }
+  }catch(e){ console.warn('Supabase caixa fecho sync:', e); }
   caixaAtual=null;
   save(); closePanel('ov-caixa'); clearPOSCart(); toast(`Caixa fechada: ${estado}`); renderPOS();
 }
@@ -4241,6 +4262,10 @@ async function sbSyncAll(){
       const rows = stockMovimentos.map(m=>({...m, user_id:userId}));
       await fetch(base+'/rest/v1/stock_movimentos', { method:'POST', headers, body:JSON.stringify(rows) });
     }
+    if(caixa.length){
+      const rows = caixa.map(c=>({...c, user_id:userId, updated_at:new Date().toISOString()}));
+      await fetch(base+'/rest/v1/caixa', { method:'POST', headers, body:JSON.stringify(rows) });
+    }
     toast('Sincronização completa ✓ Todos os dados enviados para Supabase.');
   }catch(e){
     toast('Erro de sincronização: '+e.message,'error');
@@ -4263,23 +4288,26 @@ async function sbPullData(silent=false){
   if(!silent) toast('A descarregar dados do Supabase...');
   try{
     const userFilter = isAdmin ? '' : '&user_id=eq.'+userId;
-    const [fRes, cRes, pRes, dRes] = await Promise.all([
+    const [fRes, cRes, pRes, dRes, cxRes] = await Promise.all([
       fetch(base+'/rest/v1/faturas?select=*'+userFilter, { headers }),
       fetch(base+'/rest/v1/contatos?select=*'+userFilter, { headers }),
       fetch(base+'/rest/v1/produtos?select=*'+userFilter, { headers }),
-      fetch(base+'/rest/v1/despesas?select=*'+userFilter, { headers })
+      fetch(base+'/rest/v1/despesas?select=*'+userFilter, { headers }),
+      fetch(base+'/rest/v1/caixa?select=*'+userFilter, { headers })
     ]);
     const f = fRes.ok ? await fRes.json() : [];
     const c = cRes.ok ? await cRes.json() : [];
     const p = pRes.ok ? await pRes.json() : [];
     const d = dRes.ok ? await dRes.json() : [];
+    const cx = cxRes.ok ? await cxRes.json() : [];
     if(f?.length){ faturas=f; DB.set('faturas',faturas); }
     if(c?.length){ contatos=c; DB.set('contatos',contatos); }
     if(p?.length){ produtos=p; DB.set('produtos',produtos); }
     if(d?.length){ despesas=d; DB.set('despesas',despesas); }
+    if(cx?.length){ caixa=cx; DB.set('caixa',caixa); }
     save();
     if(!silent){
-      toast('Dados actualizados ✓ ('+(( f?.length||0)+(c?.length||0)+(p?.length||0)+(d?.length||0))+' registos)');
+      toast('Dados actualizados ✓ ('+(( f?.length||0)+(c?.length||0)+(p?.length||0)+(d?.length||0)+(cx?.length||0))+' registos)');
       nav('dashboard');
     } else {
       renderDashboard && renderDashboard();
