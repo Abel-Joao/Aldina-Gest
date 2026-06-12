@@ -1,7 +1,7 @@
 FROM oven/bun:1.3.5-alpine AS base
 WORKDIR /app
 
-# Instalar dependências
+# Instalar dependências (raiz + workspaces)
 COPY package.json bun.lock ./
 COPY packages/web/package.json ./packages/web/
 
@@ -20,15 +20,12 @@ RUN cp -r public/app dist/ 2>/dev/null || true
 RUN cp public/favicon.ico dist/ 2>/dev/null || true
 RUN cp public/og-image.png dist/ 2>/dev/null || true
 
-# Imagem final — apenas o necessário para correr
+# Imagem final
 FROM oven/bun:1.3.5-alpine
 WORKDIR /app
 
-COPY --from=base /app/packages/web/dist ./packages/web/dist
-COPY --from=base /app/packages/web/src ./packages/web/src
-COPY --from=base /app/packages/web/package.json ./packages/web/package.json
-COPY --from=base /app/node_modules ./node_modules
-RUN mkdir -p ./packages/web/node_modules
+# Copiar tudo da fase de build — incluindo node_modules instalados
+COPY --from=base /app ./
 
 EXPOSE 3000
 
