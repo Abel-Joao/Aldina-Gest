@@ -458,88 +458,169 @@ footer{border-top:1px solid var(--border);padding:40px 5%;display:flex;align-ite
   <div style="text-align:center">
     <div class="section-badge">💳 Preços</div>
     <h2 class="section-title" style="margin:0 auto 14px">Licenças simples e transparentes</h2>
-    <p class="section-sub" style="margin:0 auto 48px">Escolha o período de acesso ao Aldina Gest. Todos os pacotes incluem <strong style="color:var(--accent2)">14 dias grátis</strong> sem cartão de crédito.</p>
+    <p class="section-sub" style="margin:0 auto 48px">Experimente grátis por <strong style="color:var(--accent2)">14 dias</strong>. Sem cartão de crédito.</p>
   </div>
-  <div class="pricing-grid">
-    <div class="price-card">
+
+  <!-- Toggle Mensal / Anual -->
+  <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:36px">
+    <span id="toggle-label-mensal" style="font-size:14px;font-weight:600;color:var(--text)">Mensal</span>
+    <div id="billing-toggle" onclick="toggleBilling()" style="width:48px;height:26px;border-radius:99px;background:var(--accent);cursor:pointer;position:relative;transition:background .2s">
+      <div id="toggle-knob" style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s"></div>
+    </div>
+    <span id="toggle-label-anual" style="font-size:14px;font-weight:600;color:var(--text2)">Anual</span>
+    <span style="background:var(--green-bg);color:var(--green);border:1px solid rgba(34,197,94,.25);font-size:11px;font-weight:700;padding:2px 10px;border-radius:8px;letter-spacing:.3px">POUPA 1 MÊS</span>
+  </div>
+
+  <div class="pricing-grid" style="grid-template-columns:repeat(2,1fr);max-width:700px">
+
+    <!-- MENSAL -->
+    <div class="price-card" id="card-mensal">
       <div class="price-plan">Mensal</div>
-      <div class="price-amount">5.000 <span>Kz</span></div>
-      <div class="price-period">licença de 1 mês · 1 utilizador</div>
+      <div class="price-amount">4.000 <span>Kz</span></div>
+      <div class="price-period">por mês · renovação mensal</div>
+      <div style="background:var(--green-bg);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--green);font-weight:500;margin-bottom:18px">✓ 14 dias grátis incluídos</div>
       <div class="price-features">
-        <div class="price-feat"><span class="check">✓</span> Facturação completa</div>
-        <div class="price-feat"><span class="check">✓</span> Facturas e recibos</div>
-        <div class="price-feat"><span class="check">✓</span> Clientes & Fornecedores</div>
-        <div class="price-feat"><span class="check">✓</span> Stock e produtos</div>
+        <div class="price-feat"><span class="check">✓</span> Facturação ilimitada</div>
+        <div class="price-feat"><span class="check">✓</span> Clientes & Produtos</div>
+        <div class="price-feat"><span class="check">✓</span> Stock e POS</div>
+        <div class="price-feat"><span class="check">✓</span> Dashboard & P&L</div>
         <div class="price-feat"><span class="check">✓</span> PDF de facturas</div>
-        <div class="price-feat"><span class="check">✓</span> Dashboard financeiro</div>
-        <div class="price-feat"><span class="cross">✕</span> POS Venda</div>
-        <div class="price-feat"><span class="check">✓</span> Suporte básico</div>
+        <div class="price-feat"><span class="check">✓</span> Controlo de Caixa</div>
+        <div class="price-feat"><span class="check">✓</span> 1 utilizador</div>
+        <div class="price-feat"><span class="check">✓</span> Suporte por e-mail</div>
+        <div class="price-feat" style="opacity:.5"><span class="cross">✕</span> Relatórios avançados</div>
+        <div class="price-feat" style="opacity:.5"><span class="cross">✕</span> Faturação via WhatsApp AI</div>
+        <div class="price-feat" style="opacity:.5"><span class="cross">✕</span> Integração AGT (futuro)</div>
       </div>
       <button class="btn btn-outline btn-full" onclick="openRegister()">Começar grátis</button>
     </div>
-    <div class="price-card popular">
-      <div class="popular-badge">⭐ Mais popular</div>
-      <div class="price-plan" style="color:var(--accent2)">Semestral</div>
-      <div class="price-amount" style="color:var(--accent2)">30.000 <span>Kz</span></div>
-      <div class="price-period">licença de 6 meses · 1 utilizador</div>
+
+    <!-- ANUAL -->
+    <div class="price-card popular" id="card-anual">
+      <div class="popular-badge">⭐ Melhor valor</div>
+      <div class="price-plan" style="color:var(--accent2)">Anual</div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+        <div class="price-amount" style="color:var(--accent2)">44.000 <span>Kz</span></div>
+        <div style="font-size:12px;color:var(--text3);text-decoration:line-through">48.000 Kz</div>
+      </div>
+      <div class="price-period">por ano · paga 11 meses, usa 12</div>
+      <div style="background:rgba(108,99,255,.12);border:1px solid rgba(108,99,255,.25);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--accent2);font-weight:500;margin-bottom:18px">✓ 14 dias grátis + 1 mês brinde</div>
       <div class="price-features">
         <div class="price-feat"><span class="check">✓</span> Tudo do Mensal</div>
-        <div class="price-feat"><span class="check">✓</span> Licença válida por 6 meses</div>
-        <div class="price-feat"><span class="check">✓</span> POS Venda liberado</div>
-        <div class="price-feat"><span class="check">✓</span> Melhor para uso contínuo</div>
-        <div class="price-feat"><span class="check">✓</span> Configuração inicial</div>
-        <div class="price-feat"><span class="check">✓</span> Relatórios de vendas</div>
+        <div class="price-feat"><span class="check">✓</span> Relatórios avançados</div>
+        <div class="price-feat"><span class="check">✓</span> Até 3 utilizadores</div>
         <div class="price-feat"><span class="check">✓</span> Suporte prioritário</div>
+        <div class="price-feat"><span class="check">✓</span> Formação de utilização</div>
+        <div class="price-feat"><span class="check">✓</span> Configuração inicial</div>
+        <div class="price-feat" style="color:var(--gold)"><span style="color:var(--gold)">★</span> Faturação via WhatsApp AI</div>
+        <div class="price-feat" style="color:var(--accent2)"><span style="color:var(--accent2)">◎</span> Integração AGT (quando disponível)</div>
       </div>
       <button class="btn btn-primary btn-full" onclick="openRegister()">Começar grátis →</button>
     </div>
-    <div class="price-card">
-      <div class="price-plan">Anual</div>
-      <div class="price-amount">60.000 <span>Kz</span></div>
-      <div class="price-period">licença de 1 ano · 1 utilizador</div>
-      <div class="price-features">
-        <div class="price-feat"><span class="check">✓</span> Tudo do Semestral</div>
-        <div class="price-feat"><span class="check">✓</span> Licença válida por 12 meses</div>
-        <div class="price-feat"><span class="check">✓</span> POS Venda liberado</div>
-        <div class="price-feat"><span class="check">✓</span> Renovação anual simples</div>
-        <div class="price-feat"><span class="check">✓</span> Formação de utilização</div>
-        <div class="price-feat"><span class="check">✓</span> Acompanhamento dedicado</div>
-        <div class="price-feat"><span class="check">✓</span> Suporte prioritário</div>
-      </div>
-      <button class="btn btn-outline btn-full" onclick="openRegister()">Começar grátis</button>
-    </div>
   </div>
-  <div class="payment-box">
+
+  <!-- PAGAMENTO -->
+  <div class="payment-box" style="max-width:700px">
     <div class="payment-head">
       <div>
-        <div class="payment-title">Pagamento por transferência bancária</div>
-        <div class="payment-sub">Após o pagamento, envie o comprovativo por e-mail para confirmação da licença.</div>
+        <div class="payment-title">Como pagar</div>
+        <div class="payment-sub">Transferência bancária ou Multicaixa Express. Envie o comprovativo e activamos a sua licença em minutos.</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-      <a class="whatsapp-link" href="mailto:aldinagest@gmail.com?subject=Comprovativo%20de%20pagamento%20Aldina%20Gest">aldinagest@gmail.com</a>
+        <a class="whatsapp-link" href="mailto:aldinagest@gmail.com?subject=Comprovativo%20Aldina%20Gest">✉ aldinagest@gmail.com</a>
         <a class="whatsapp-link" href="https://wa.me/244941969334" target="_blank" rel="noopener">WhatsApp: 941 969 334</a>
       </div>
     </div>
-    <div class="payment-grid">
-      <div class="bank-card">
-        <div class="bank-name">BFA</div>
-        <div class="bank-iban">IBAN: 0006 0000 08326835301 94</div>
-        <div class="bank-holder">Titular: Abel Kunhaki Nicolau João</div>
-      </div>
-      <div class="bank-card">
-        <div class="bank-name">BCI</div>
-        <div class="bank-iban">IBAN: 0005 0000 75082948101 97</div>
-        <div class="bank-holder">Titular: Abel Kunhaki Nicolau João</div>
-      </div>
-      <div class="bank-card">
-        <div class="bank-name">BIC</div>
-        <div class="bank-iban">IBAN: 0051 0000 36411881101 41</div>
-        <div class="bank-holder">Titular: Abel Kunhaki Nicolau João</div>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button id="tab-transferencia" onclick="showPayTab('transferencia')" style="padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff;font-family:var(--font)">Transferência Bancária</button>
+      <button id="tab-multicaixa" onclick="showPayTab('multicaixa')" style="padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:none;color:var(--text2);font-family:var(--font)">Multicaixa Express</button>
+    </div>
+
+    <!-- Transferência -->
+    <div id="pay-transferencia">
+      <div class="payment-grid">
+        <div class="bank-card">
+          <div class="bank-name">BFA</div>
+          <div class="bank-iban">IBAN: 0006 0000 08326835301 94</div>
+          <div class="bank-holder">Titular: Abel Kunhaki Nicolau João</div>
+        </div>
+        <div class="bank-card">
+          <div class="bank-name">BCI</div>
+          <div class="bank-iban">IBAN: 0005 0000 75082948101 97</div>
+          <div class="bank-holder">Titular: Abel Kunhaki Nicolau João</div>
+        </div>
+        <div class="bank-card">
+          <div class="bank-name">BIC</div>
+          <div class="bank-iban">IBAN: 0051 0000 36411881101 41</div>
+          <div class="bank-holder">Titular: Abel Kunhaki Nicolau João</div>
+        </div>
       </div>
     </div>
+
+    <!-- Multicaixa Express -->
+    <div id="pay-multicaixa" style="display:none">
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <div style="width:52px;height:52px;border-radius:12px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">📱</div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px">Multicaixa Express</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:10px">Transfira directamente pelo app Multicaixa Express para o número:</div>
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--amber);letter-spacing:2px;margin-bottom:6px">941 969 334</div>
+          <div style="font-size:12px;color:var(--text3)">Nome: Abel Kunhaki Nicolau João</div>
+        </div>
+        <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--amber);line-height:1.7">
+          <strong style="display:block;margin-bottom:4px">Passos:</strong>
+          1. Abra o Multicaixa Express<br>
+          2. Transferência → Por número<br>
+          3. Insira <strong>941 969 334</strong><br>
+          4. Valor: <strong>4.000 Kz</strong> (mensal) ou <strong>44.000 Kz</strong> (anual)<br>
+          5. Envie o comprovativo via WhatsApp
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--text3)">
+        💡 <strong style="color:var(--text2)">Referência Multicaixa (entidade)</strong> — brevemente disponível para pagamento directo no ATM e internetbanking. Por enquanto, use o Multicaixa Express ou transferência bancária.
+      </div>
+    </div>
+
+    <div style="margin-top:16px;padding:12px 14px;background:rgba(108,99,255,.07);border:1px solid rgba(108,99,255,.2);border-radius:10px;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:8px">
+      <span style="font-size:16px">⚡</span>
+      Após envio do comprovativo, a licença é activada <strong style="color:var(--accent2)">em menos de 1 hora</strong> em dias úteis.
+    </div>
   </div>
-  <p class="trial-note">Todos os pacotes incluem <strong>14 dias de experimentação gratuita</strong>. Sem compromisso, sem cartão de crédito.</p>
+
+  <p class="trial-note">Todos os planos incluem <strong>14 dias de experimentação gratuita</strong>. Sem compromisso, sem cartão de crédito.</p>
 </section>
+
+<script>
+function toggleBilling(){
+  var knob=document.getElementById('toggle-knob');
+  var lm=document.getElementById('toggle-label-mensal');
+  var la=document.getElementById('toggle-label-anual');
+  var cm=document.getElementById('card-mensal');
+  var ca=document.getElementById('card-anual');
+  var active=knob.style.transform==='translateX(22px)';
+  if(active){
+    knob.style.transform='translateX(0)';
+    lm.style.color='var(--text)'; la.style.color='var(--text2)';
+    cm.style.opacity='1'; ca.style.opacity='.6';
+  } else {
+    knob.style.transform='translateX(22px)';
+    la.style.color='var(--text)'; lm.style.color='var(--text2)';
+    ca.style.opacity='1'; cm.style.opacity='.6';
+  }
+}
+function showPayTab(tab){
+  document.getElementById('pay-transferencia').style.display = tab==='transferencia'?'block':'none';
+  document.getElementById('pay-multicaixa').style.display = tab==='multicaixa'?'block':'none';
+  document.getElementById('tab-transferencia').style.background = tab==='transferencia'?'var(--accent)':'none';
+  document.getElementById('tab-transferencia').style.color = tab==='transferencia'?'#fff':'var(--text2)';
+  document.getElementById('tab-transferencia').style.borderColor = tab==='transferencia'?'var(--accent)':'var(--border2)';
+  document.getElementById('tab-multicaixa').style.background = tab==='multicaixa'?'var(--accent)':'none';
+  document.getElementById('tab-multicaixa').style.color = tab==='multicaixa'?'#fff':'var(--text2)';
+  document.getElementById('tab-multicaixa').style.borderColor = tab==='multicaixa'?'var(--accent)':'var(--border2)';
+}
+</script>
 
 <!-- TESTEMUNHOS -->
 <section id="testemunhos">
