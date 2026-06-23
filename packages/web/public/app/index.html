@@ -3265,7 +3265,16 @@ function checkSession(){
     if(daysLeft <= 0){
       showTrialExpired(); return false;
     }
-    if(daysLeft <= 3) showTrialWarning(daysLeft);
+    if(daysLeft <= 3){
+      showTrialWarning(daysLeft);
+      // Enviar email de aviso (só uma vez por dia, via flag localStorage)
+      const session = JSON.parse(localStorage.getItem('ag_session')||'{}');
+      const flagKey = 'ag_trial_email_sent_'+String(Math.floor(Date.now()/(1000*60*60*24)));
+      if(!localStorage.getItem(flagKey) && session.email){
+        localStorage.setItem(flagKey, '1');
+        sendEmailAuto('trial-expira', session.email, account.nome||account.empresa||'Cliente', { dias: daysLeft });
+      }
+    }
   }
   // Actualizar sidebar com nome do utilizador
   if(account){
@@ -3828,6 +3837,8 @@ async function activarCodigoLicenca(source){
 
     if(fb){fb.style.color='var(--green)';fb.textContent='✓ Licença activada com sucesso! A recarregar...';}
     toast('🎉 Licença '+plano+' activada! Bem-vindo ao Aldina Gest.','success');
+    // Enviar email de licença activada
+    sendEmailAuto('licenca-activada', account.email||'', account.nome||account.empresa||'Cliente', { plano: plano==='anual'?'Anual':'Mensal', codigo });
     setTimeout(()=>{ location.reload(); }, 1800);
   }catch(e){
     if(fb){fb.style.color='var(--red)';fb.textContent='Erro: '+e.message;}
@@ -4933,6 +4944,21 @@ async function ilDoLogin(){
   }
 }
 
+// ===== EMAILS AUTOMÁTICOS =====
+async function sendEmailAuto(type, to, nome, extras){
+  try{
+    const body = { type, to, nome, ...(extras||{}) };
+    await fetch('/api/email/send', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    console.log('[email] Enviado:', type, to);
+  }catch(e){
+    console.warn('[email] Falha ao enviar '+type+':', e.message);
+  }
+}
+
 // ===== REGISTO COM SUPABASE AUTH =====
 async function ilDoRegister(){
   const nome = (document.getElementById('il-reg-nome').value||'').trim();
@@ -4991,6 +5017,9 @@ async function ilDoRegister(){
     document.getElementById('il-reg-pass').value = '';
     document.getElementById('il-reg-pass2').value = '';
     btnEl.textContent = 'Criar conta'; btnEl.disabled = false;
+
+    // Enviar email de boas-vindas (não bloqueia)
+    sendEmailAuto('boas-vindas', email, nome, { plano: 'Trial' });
 
     if(regData.access_token){
       sucEl.textContent = '✓ Conta criada com sucesso!';

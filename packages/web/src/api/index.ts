@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { waApp } from './whatsapp';
+import { emailApp } from './email';
 
 const SUPABASE_URL = 'https://adzslgrktdundlozmcoa.supabase.co';
 // Usar service_role no proxy para bypass RLS (o proxy é o ponto de segurança)
@@ -137,5 +138,8 @@ const app = new Hono()
 // Montar rotas WhatsApp
 const appWithWa = app.route('/', waApp);
 
-export type AppType = typeof appWithWa;
-export default appWithWa;
+// Montar rotas Email
+const appWithEmail = appWithWa.route('/', emailApp);
+
+export type AppType = typeof appWithEmail;
+export default appWithEmail;
