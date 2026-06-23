@@ -186,17 +186,34 @@ export const emailApp = new Hono()
     }
   })
 
-  // Teste rápido (só em dev)
+  // Teste rápido via GET
   .get('/test', async (c) => {
     const to = c.req.query('to');
-    const type = (c.req.query('type') || 'boas-vindas') as any;
+    const type = (c.req.query('type') || 'boas-vindas') as 'boas-vindas' | 'trial-expira' | 'licenca-activada' | 'licenca-expirada';
     if (!to) return c.json({ error: 'Passa ?to=email&type=boas-vindas' }, 400);
+    if (!GMAIL_PASS) return c.json({ error: 'GMAIL_APP_PASSWORD não configurado' }, 500);
 
-    const res = await fetch(`${c.req.url.split('/email')[0]}/email/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, to, nome: 'Teste', plano: 'Mensal', dias: 3, codigo: 'TEST-1234' }),
-    });
-    const data = await res.json();
-    return c.json(data);
+    try {
+      let email: { subject: string; html: string };
+      switch (type) {
+        case 'boas-vindas': email = emailBoasVindas('Teste', 'Mensal'); break;
+        case 'trial-expira': email = emailTrialExpira('Teste', 3); break;
+        case 'licenca-activada': email = emailLicencaActivada('Teste', 'Mensal', 'TEST-1234'); break;
+        case 'licenca-expirada': email = emailLicencaExpirada('Teste'); break;
+        default: return c.json({ error: 'Tipo inválido' }, 400);
+      }
+
+      const transporter = createTransporter();
+      await transporter.sendMail({
+        from: `"Aldina Gest" <${GMAIL_USER}>`,
+        to,
+        subject: email.subject,
+        html: email.html,
+      });
+
+      return c.json({ ok: true, type, to });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return c.json({ error: msg }, 500);
+    }
   });
