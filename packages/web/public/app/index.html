@@ -943,7 +943,7 @@ tbody tr:last-child td{border-bottom:none}
             <button class="btn btn-ghost btn-sm" onclick="exportCSVProdutos()">📦 Produtos</button>
           </div>
           <div style="height:1px;background:var(--border);margin:4px 0"></div>
-          <button class="btn btn-primary" onclick="openSupabaseConfig()">⚡ Configurar Supabase</button>
+          <!-- Supabase hardcoded — botão de configuração ocultado -->
           <button class="btn btn-ghost" onclick="sbSyncAll()">☁ Enviar dados para Supabase</button>
           <button class="btn btn-ghost" onclick="sbPullData()">↓ Descarregar do Supabase</button>
           <div class="section-sep">Zona de perigo</div>
@@ -4434,10 +4434,8 @@ function getStoredSBConfig(){
 }
 
 function getSupabaseClient(){
-  // Merge: window.ALDINA_SUPABASE é base (tem proxyUrl), stored config pode sobrepor url/anonKey
-  const stored = getStoredSBConfig() || {};
-  const base = window.ALDINA_SUPABASE || {};
-  const cfg = Object.assign({}, base, stored);
+  // Sempre usar as credenciais hardcoded em window.ALDINA_SUPABASE
+  const cfg = window.ALDINA_SUPABASE || {};
   if(!cfg.url || !cfg.anonKey || !window.supabase) return null;
   if(!supabaseClient) supabaseClient = window.supabase.createClient(_sbEffectiveUrl(cfg), cfg.anonKey);
   return supabaseClient;
@@ -4479,17 +4477,12 @@ function openSupabaseConfig(){
 }
 
 function updateSBStatusUI(){
-  const cfg = getStoredSBConfig();
   const dot = document.getElementById('sb-status-dot');
   const txt = document.getElementById('sb-status-text');
   if(!dot||!txt) return;
-  if(cfg?.url && cfg?.anonKey){
-    dot.className='sb-status-dot sb-connected';
-    txt.textContent='Configurado — '+cfg.url.replace('https://','').split('.')[0]+'...';
-  } else {
-    dot.className='sb-status-dot sb-disconnected';
-    txt.textContent='Não configurado';
-  }
+  // Credenciais sempre hardcoded — sempre configurado
+  dot.className='sb-status-dot sb-connected';
+  txt.textContent='Configurado';
 }
 
 function saveSupabase(){
