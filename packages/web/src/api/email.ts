@@ -1,23 +1,11 @@
 import { Hono } from 'hono';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-const GMAIL_USER = 'aldinagest@gmail.com';
-const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD || '';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const FROM_EMAIL = 'Aldina Gest <onboarding@resend.dev>';
 
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    auth: {
-      user: GMAIL_USER,
-      pass: GMAIL_PASS,
-    },
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
+function getResend() {
+  return new Resend(RESEND_API_KEY);
 }
 
 // ─── Templates HTML ──────────────────────────────────────────────────────────
@@ -153,8 +141,8 @@ export const emailApp = new Hono()
         return c.json({ error: 'Campos obrigatórios: type, to, nome' }, 400);
       }
 
-      if (!GMAIL_PASS) {
-        return c.json({ error: 'GMAIL_APP_PASSWORD não configurado no servidor' }, 500);
+      if (!RESEND_API_KEY) {
+        return c.json({ error: 'RESEND_API_KEY não configurado no servidor' }, 500);
       }
 
       let email: { subject: string; html: string };
@@ -176,13 +164,15 @@ export const emailApp = new Hono()
           return c.json({ error: 'Tipo de email inválido' }, 400);
       }
 
-      const transporter = createTransporter();
-      await transporter.sendMail({
-        from: `"Aldina Gest" <${GMAIL_USER}>`,
+      const resend = getResend();
+      const { error: sendError } = await resend.emails.send({
+        from: FROM_EMAIL,
         to,
         subject: email.subject,
         html: email.html,
       });
+
+      if (sendError) throw new Error(sendError.message);
 
       return c.json({ ok: true, type, to });
     } catch (e: unknown) {
@@ -197,7 +187,7 @@ export const emailApp = new Hono()
     const to = c.req.query('to');
     const type = (c.req.query('type') || 'boas-vindas') as 'boas-vindas' | 'trial-expira' | 'licenca-activada' | 'licenca-expirada';
     if (!to) return c.json({ error: 'Passa ?to=email&type=boas-vindas' }, 400);
-    if (!GMAIL_PASS) return c.json({ error: 'GMAIL_APP_PASSWORD não configurado' }, 500);
+    if (!RESEND_API_KEY) return c.json({ error: 'RESEND_API_KEY não configurado' }, 500);
 
     try {
       let email: { subject: string; html: string };
@@ -209,13 +199,15 @@ export const emailApp = new Hono()
         default: return c.json({ error: 'Tipo inválido' }, 400);
       }
 
-      const transporter = createTransporter();
-      await transporter.sendMail({
-        from: `"Aldina Gest" <${GMAIL_USER}>`,
+      const resend = getResend();
+      const { error: sendError } = await resend.emails.send({
+        from: FROM_EMAIL,
         to,
         subject: email.subject,
         html: email.html,
       });
+
+      if (sendError) throw new Error(sendError.message);
 
       return c.json({ ok: true, type, to });
     } catch (e: unknown) {
