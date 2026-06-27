@@ -830,8 +830,12 @@ tbody tr:last-child td{border-bottom:none}
         <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
           <div style="display:flex;flex-direction:column;gap:8px">
             <div id="plano-mensal" class="plano-opt" onclick="selectPlano('mensal')" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--rsm);padding:14px;cursor:pointer;transition:all .15s">
-              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">Mensal</span><span style="font-family:var(--mono);color:var(--text2)">4.000 Kz</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">Mensal</span><span style="font-family:var(--mono);color:var(--text2)">4.900 Kz</span></div>
               <div style="font-size:12px;color:var(--text3);margin-top:3px">1 mês · 1 utilizador · renovação mensal</div>
+            </div>
+            <div id="plano-semestral" class="plano-opt" onclick="selectPlano('semestral')" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--rsm);padding:14px;cursor:pointer;transition:all .15s">
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600;color:var(--accent2)">Semestral</span><span style="font-family:var(--mono);color:var(--accent2)">28.900 Kz</span></div>
+              <div style="font-size:12px;color:var(--text3);margin-top:3px">6 meses · até 2 utilizadores · POS incluído</div>
             </div>
             <div id="plano-anual" class="plano-opt" onclick="selectPlano('anual')" style="background:var(--accent3);border:1px solid var(--accent);border-radius:var(--rsm);padding:14px;cursor:pointer;transition:all .15s">
               <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600;color:var(--accent2)">Anual ⭐</span><span style="font-family:var(--mono);color:var(--accent2)">44.000 Kz</span></div>
@@ -1222,7 +1226,8 @@ tbody tr:last-child td{border-bottom:none}
       <div class="form-group">
         <label class="form-label">Plano</label>
         <select class="form-input form-sel2" id="gc-plano">
-          <option value="mensal">Mensal — 4.000 Kz</option>
+          <option value="mensal">Mensal — 4.900 Kz</option>
+          <option value="semestral">Semestral — 28.900 Kz</option>
           <option value="anual">Anual — 44.000 Kz</option>
         </select>
       </div>
@@ -3217,9 +3222,9 @@ function closeModalBg(e,id){ if(e.target===document.getElementById(id)) closeMod
 
 // ========== SESSÃO & TRIAL ==========
 const licensePlans = {
-  mensal:{nome:'Mensal',preco:'5.000 Kz / 1 mês',cor:'var(--text2)',dias:30,pos:false},
+  mensal:{nome:'Mensal',preco:'4.900 Kz / 1 mês',cor:'var(--text2)',dias:30,pos:false},
   semestral:{nome:'Semestral',preco:'28.900 Kz / 6 meses',cor:'var(--accent2)',dias:180,pos:true},
-  anual:{nome:'Anual',preco:'60.000 Kz / 1 ano',cor:'var(--gold)',dias:365,pos:true}
+  anual:{nome:'Anual',preco:'44.000 Kz / 1 ano',cor:'var(--gold)',dias:365,pos:true}
 };
 
 function normalizeEmail(email){
@@ -3339,8 +3344,13 @@ function showTrialExpired(){
           <div style="display:flex;gap:10px;margin-bottom:14px">
             <div id="blk-plan-mensal" onclick="blkSelectPlan('mensal')" style="flex:1;border:2px solid var(--accent);background:var(--accent3);border-radius:10px;padding:12px;cursor:pointer;text-align:center">
               <div style="font-size:13px;font-weight:700">Mensal</div>
-              <div style="font-size:18px;font-weight:700;color:var(--accent2);margin:4px 0">4.000 Kz</div>
+              <div style="font-size:18px;font-weight:700;color:var(--accent2);margin:4px 0">4.900 Kz</div>
               <div style="font-size:11px;color:var(--text3)">por mês</div>
+            </div>
+            <div id="blk-plan-semestral" onclick="blkSelectPlan('semestral')" style="flex:1;border:1px solid var(--border);background:var(--bg3);border-radius:10px;padding:12px;cursor:pointer;text-align:center">
+              <div style="font-size:13px;font-weight:700">Semestral</div>
+              <div style="font-size:18px;font-weight:700;color:var(--accent2);margin:4px 0">28.900 Kz</div>
+              <div style="font-size:11px;color:var(--text3)">6 meses · POS incluído</div>
             </div>
             <div id="blk-plan-anual" onclick="blkSelectPlan('anual')" style="flex:1;border:1px solid var(--border);background:var(--bg3);border-radius:10px;padding:12px;cursor:pointer;text-align:center">
               <div style="font-size:13px;font-weight:700">Anual</div>
@@ -3380,7 +3390,7 @@ function blkSelectPlan(p){
 
 function blkAbrirWhatsApp(e){
   e.preventDefault();
-  const plano = window._blkPlan==='anual' ? 'Anual (44.000 Kz)' : 'Mensal (4.000 Kz)';
+  const plano = window._blkPlan==='anual' ? 'Anual (44.000 Kz)' : window._blkPlan==='semestral' ? 'Semestral (28.900 Kz)' : 'Mensal (4.900 Kz)';
   const account = JSON.parse(localStorage.getItem('ag_account')||'{}');
   const msg = encodeURIComponent('Olá! Acabei de efectuar o pagamento do Aldina Gest.\n\nPlano: '+plano+'\nE-mail da conta: '+(account.email||'—')+'\n\nSeguem em anexo os dados do comprovativo. Por favor activem a minha licença. Obrigado!');
   window.open('https://wa.me/244941969334?text='+msg,'_blank');
@@ -3692,7 +3702,7 @@ async function gerarCodigoLicenca(){
     window._lastCodigoGerado = codigo;
 
     // Link WhatsApp
-    const planoLabel = plano==='anual'?'Anual (44.000 Kz)':'Mensal (4.000 Kz)';
+    const planoLabel = plano==='anual'?'Anual (44.000 Kz)':plano==='semestral'?'Semestral (28.900 Kz)':'Mensal (4.900 Kz)';
     const msg = encodeURIComponent('Olá! O seu pagamento foi confirmado.\n\n🔑 Código de licença Aldina Gest:\n'+codigo+'\n\nPlano: '+planoLabel+'\n\nAceda a https://aldina-gest-production.up.railway.app/app → Configurações → Licença → "Activar com código" e cole o código acima.\n\nObrigado por escolher o Aldina Gest!');
     const dest = email ? '' : '244941969334';
     document.getElementById('gc-whatsapp-link').href = 'https://wa.me/'+dest+'?text='+msg;
@@ -3731,7 +3741,7 @@ async function renderLicenseCodes(){
         : c.expires_at && new Date(c.expires_at)<new Date()
           ? '<span class="badge b-overdue">Expirado</span>'
           : '<span class="badge b-paid">Disponível</span>';
-      const planoLabel = c.plano==='anual'?'Anual':'Mensal';
+      const planoLabel = c.plano==='anual'?'Anual':c.plano==='semestral'?'Semestral':'Mensal';
       const copiaBtnId = 'copy-'+c.id;
       return `<tr>
         <td><span style="font-family:var(--mono);font-size:12px;color:var(--accent2);letter-spacing:1px">${esc(c.code)}</span></td>
@@ -3756,7 +3766,7 @@ function copiarCodigo(code){
 }
 
 function enviarCodigoWhatsApp(code, plano, email){
-  const planoLabel = plano==='anual'?'Anual (44.000 Kz)':'Mensal (4.000 Kz)';
+  const planoLabel = plano==='anual'?'Anual (44.000 Kz)':plano==='semestral'?'Semestral (28.900 Kz)':'Mensal (4.900 Kz)';
   const msg = encodeURIComponent('Olá! O seu pagamento foi confirmado.\n\n🔑 Código de licença Aldina Gest:\n'+code+'\n\nPlano: '+planoLabel+'\n\nAceda a https://aldina-gest-production.up.railway.app/app → Configurações → Licença → "Activar com código" e cole o código acima.\n\nObrigado por escolher o Aldina Gest!');
   window.open('https://wa.me/?text='+msg,'_blank');
 }
