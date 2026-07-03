@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { Resend } from 'resend';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
-const FROM_EMAIL = 'Aldina Gest <onboarding@resend.dev>';
+const FROM_EMAIL = 'Aldina Gest <noreply@aldinagest.com>';
 
 function getResend() {
   return new Resend(RESEND_API_KEY);
@@ -66,7 +66,7 @@ function emailBoasVindas(nome: string, plano: string): { subject: string; html: 
     </ul>
     <div class="divider"></div>
     <p>Aceda à sua conta e comece agora:</p>
-    <a class="btn" href="https://aldina-gest-production.up.railway.app/app">Entrar no Aldina Gest</a>
+    <a class="btn" href="https://aldinagest.com/app">Entrar no Aldina Gest</a>
     <p style="font-size:13px;color:#6b7280;">Precisa de ajuda? Entre em contacto connosco a qualquer momento.</p>
   `);
   return { subject, html };
@@ -84,7 +84,7 @@ function emailTrialExpira(nome: string, dias: number): { subject: string; html: 
       <li><strong>Mensal</strong> — flexibilidade total</li>
       <li><strong>Anual</strong> — melhor preço + faturação via WhatsApp (em breve)</li>
     </ul>
-    <a class="btn" href="https://aldina-gest-production.up.railway.app/app">Activar Licença</a>
+    <a class="btn" href="https://aldinagest.com/app">Activar Licença</a>
     <p style="font-size:13px;color:#6b7280;">Não perca o acesso aos seus dados. Active já!</p>
   `);
   return { subject, html };
@@ -100,7 +100,7 @@ function emailLicencaActivada(nome: string, plano: string, codigo: string): { su
       <p><strong>${codigo}</strong></p>
     </div>
     <p>Agora tem acesso completo a todas as funcionalidades do Aldina Gest. Aproveite ao máximo!</p>
-    <a class="btn" href="https://aldina-gest-production.up.railway.app/app">Ir para o Dashboard</a>
+    <a class="btn" href="https://aldinagest.com/app">Ir para o Dashboard</a>
     <p style="font-size:13px;color:#6b7280;">Guarde este email como comprovativo de activação da sua licença.</p>
   `);
   return { subject, html };
@@ -112,7 +112,7 @@ function emailLicencaExpirada(nome: string): { subject: string; html: string } {
     <p>Olá <strong>${nome}</strong>,</p>
     <p>A sua licença do Aldina Gest <strong>expirou</strong>. O acesso às funcionalidades premium está suspenso.</p>
     <p>Para renovar e continuar a gerir o seu negócio sem interrupções:</p>
-    <a class="btn" href="https://aldina-gest-production.up.railway.app/app">Renovar Licença</a>
+    <a class="btn" href="https://aldinagest.com/app">Renovar Licença</a>
     <div class="divider"></div>
     <p style="font-size:13px;color:#6b7280;">Os seus dados estão seguros e serão mantidos. Renove para voltar a aceder.</p>
   `);

@@ -27,7 +27,7 @@ window.ALDINA_SUPABASE = {
   serviceRoleKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkenNsZ3JrdGR1bmRsb3ptY29hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDg5NTUxMSwiZXhwIjoyMDk2NDcxNTExfQ.e7NDV1e6paUnfFGmhKOgGbiLZafnICx4SrXoaq5iR8I',
   // proxyUrl: URL base do proxy que faz relay ao Supabase (sem barra no fim)
   // Substituído automaticamente após deploy — NÃO EDITAR MANUALMENTE
-  proxyUrl: 'https://aldina-gest-production.up.railway.app'
+  proxyUrl: 'https://aldinagest.com'
 };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
@@ -3703,7 +3703,7 @@ async function gerarCodigoLicenca(){
 
     // Link WhatsApp
     const planoLabel = plano==='anual'?'Anual (44.000 Kz)':plano==='semestral'?'Semestral (28.900 Kz)':'Mensal (4.900 Kz)';
-    const msg = encodeURIComponent('Olá! O seu pagamento foi confirmado.\n\n🔑 Código de licença Aldina Gest:\n'+codigo+'\n\nPlano: '+planoLabel+'\n\nAceda a https://aldina-gest-production.up.railway.app/app → Configurações → Licença → "Activar com código" e cole o código acima.\n\nObrigado por escolher o Aldina Gest!');
+    const msg = encodeURIComponent('Olá! O seu pagamento foi confirmado.\n\n🔑 Código de licença Aldina Gest:\n'+codigo+'\n\nPlano: '+planoLabel+'\n\nAceda a https://aldinagest.com/app → Configurações → Licença → "Activar com código" e cole o código acima.\n\nObrigado por escolher o Aldina Gest!');
     const dest = email ? '' : '244941969334';
     document.getElementById('gc-whatsapp-link').href = 'https://wa.me/'+dest+'?text='+msg;
 
@@ -3767,7 +3767,7 @@ function copiarCodigo(code){
 
 function enviarCodigoWhatsApp(code, plano, email){
   const planoLabel = plano==='anual'?'Anual (44.000 Kz)':plano==='semestral'?'Semestral (28.900 Kz)':'Mensal (4.900 Kz)';
-  const msg = encodeURIComponent('Olá! O seu pagamento foi confirmado.\n\n🔑 Código de licença Aldina Gest:\n'+code+'\n\nPlano: '+planoLabel+'\n\nAceda a https://aldina-gest-production.up.railway.app/app → Configurações → Licença → "Activar com código" e cole o código acima.\n\nObrigado por escolher o Aldina Gest!');
+  const msg = encodeURIComponent('Olá! O seu pagamento foi confirmado.\n\n🔑 Código de licença Aldina Gest:\n'+code+'\n\nPlano: '+planoLabel+'\n\nAceda a https://aldinagest.com/app → Configurações → Licença → "Activar com código" e cole o código acima.\n\nObrigado por escolher o Aldina Gest!');
   window.open('https://wa.me/?text='+msg,'_blank');
 }
 
