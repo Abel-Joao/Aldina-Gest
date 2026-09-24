@@ -778,13 +778,66 @@ function showPayTab(tab){
   </div>
 </div>
 
+<!-- ===== MODAL DEFINIR NOVA SENHA (link de recuperação) ===== -->
+<div class="modal-overlay" id="modal-newpass" onclick="closeModalBg(event,'modal-newpass')">
+  <div class="auth-modal">
+    <div class="auth-logo">
+      <img class="auth-logo-img" src="assets/aldina-gest-logo.png" alt="Aldina Gest">
+    </div>
+    <h2 class="auth-title">Definir nova palavra-passe</h2>
+    <p class="auth-sub">Escolha uma nova palavra-passe para a sua conta.</p>
+    <div class="form-group">
+      <label class="form-label" for="newpass-1">Nova palavra-passe</label>
+      <input class="form-input" id="newpass-1" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="newpass-2">Confirmar palavra-passe</label>
+      <input class="form-input" id="newpass-2" type="password" placeholder="Repita a palavra-passe" autocomplete="new-password">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitNewPassword()">Guardar nova palavra-passe →</button>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"><span id="toast-icon">✓</span> <span id="toast-msg">—</span></div>
 
 <script>
 window.addEventListener('load',()=>{
   setTimeout(()=>document.getElementById('app-loader')?.classList.add('hide'),450);
+  handleRecoveryRedirect();
 });
+
+async function handleRecoveryRedirect(){
+  const hash = window.location.hash || '';
+  const params = new URLSearchParams(hash.replace(/^#/, ''));
+  const type = params.get('type');
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
+  if(type !== 'recovery' || !accessToken) return;
+  const sb = getSupabaseClient();
+  if(!sb) return;
+  try{
+    await sb.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+  }catch(e){ console.warn('recovery setSession err:', e.message); }
+  // Limpar o hash da URL para não reprocessar / não expor o token
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+  document.getElementById('modal-newpass').classList.add('open');
+}
+
+async function submitNewPassword(){
+  const p1 = document.getElementById('newpass-1').value;
+  const p2 = document.getElementById('newpass-2').value;
+  if(!p1 || !p2){ toast('Preencha os dois campos','error'); return; }
+  if(p1.length < 8){ toast('A palavra-passe deve ter pelo menos 8 caracteres','error'); return; }
+  if(p1 !== p2){ toast('As palavras-passe não coincidem','error'); return; }
+  const sb = getSupabaseClient();
+  if(!sb){ toast('Erro de configuração. Contacte o suporte.','error'); return; }
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if(error){ toast(error.message || 'Não foi possível alterar a palavra-passe','error'); return; }
+  toast('Palavra-passe alterada com sucesso! Inicie sessão.');
+  document.getElementById('modal-newpass').classList.remove('open');
+  setTimeout(()=>openLogin(), 600);
+}
 
 let supabaseClient = null;
 function getSupabaseClient(){
