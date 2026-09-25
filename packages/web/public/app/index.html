@@ -88,6 +88,14 @@ body:not(.is-admin) .admin-only{display:none}
 .topbar-sub{font-size:11px;color:var(--text3)}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
 
+/* POS FULLSCREEN (nova aba, sem sidebar) */
+body.pos-fullscreen-mode .sidebar{display:none}
+body.pos-fullscreen-mode .main{margin-left:0}
+body.pos-fullscreen-mode .page{display:none !important}
+body.pos-fullscreen-mode .page#page-pos{display:flex !important}
+body.pos-fullscreen-mode .topbar{padding:0 20px}
+body.pos-fullscreen-mode .topbar-title::before{content:"▦ ";color:var(--accent)}
+
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--rsm);font-size:13px;font-weight:500;cursor:pointer;border:none;font-family:var(--font);transition:all .15s}
 .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent2)}
@@ -435,7 +443,7 @@ tbody tr:last-child td{border-bottom:none}
     <div class="nav-label">Principal</div>
     <div class="nav-item active" onclick="nav('dashboard')"><i class="icon">⊞</i> Dashboard</div>
     <div class="nav-item" onclick="nav('faturas')"><i class="icon">◈</i> Facturação <span class="badge" id="badge-faturas">0</span></div>
-    <div class="nav-item" onclick="nav('pos')"><i class="icon">▦</i> POS Venda <span class="badge" style="background:var(--amber-bg);color:var(--amber)">Semestral</span></div>
+    <div class="nav-item" onclick="openPOSFullscreen()"><i class="icon">▦</i> POS Venda <span class="badge" style="background:var(--amber-bg);color:var(--amber)">Semestral</span></div>
     <div class="nav-item" onclick="nav('clientes')"><i class="icon">❒</i> Clientes</div>
     <div class="nav-item" onclick="nav('fornecedores')"><i class="icon">⊕</i> Fornecedores</div>
   </div>
@@ -1498,6 +1506,15 @@ const pageTitles = {
   notificacoes:['Notificações','Alertas, lembretes e comunicações'],
   config:['Configurações','Sistema e dados da empresa'],
 };
+
+function openPOSFullscreen(){
+  if(!hasPOSAccess()){
+    toast('POS Venda disponível a partir do pacote Semestral','error');
+    return;
+  }
+  const url = location.pathname + '?pos=1';
+  window.open(url, '_blank');
+}
 
 function nav(page){
   if(page==='licencas' && !isAdminAccount()){
@@ -4781,7 +4798,19 @@ document.addEventListener('DOMContentLoaded', function(){
   }, 400);
   if(checkSession()){
     updateBadges();
-    renderDashboard();
+    const isPOSFullscreen = new URLSearchParams(location.search).get('pos')==='1';
+    if(isPOSFullscreen){
+      if(hasPOSAccess()){
+        document.body.classList.add('pos-fullscreen-mode');
+        nav('pos');
+      } else {
+        // Sem acesso ao POS — mostra dashboard normal nesta aba em vez de ecrã vazio
+        toast('POS Venda disponível a partir do pacote Semestral','error');
+        renderDashboard();
+      }
+    } else {
+      renderDashboard();
+    }
     setTimeout(()=>{ sbPullData && sbPullData(true); }, 800);
     // Refresh silencioso do perfil Supabase ao arrancar — garante que alterações do admin são vistas
     setTimeout(()=>{ refreshLicenseFromServer && refreshLicenseFromServer(); }, 2000);
@@ -4933,7 +4962,13 @@ async function ilDoLogin(){
     load();
     if(checkSession()){
       updateBadges();
-      renderDashboard();
+      const isPOSFullscreen = new URLSearchParams(location.search).get('pos')==='1';
+      if(isPOSFullscreen && hasPOSAccess()){
+        document.body.classList.add('pos-fullscreen-mode');
+        nav('pos');
+      } else {
+        renderDashboard();
+      }
       hideAppLoader();
       setTimeout(()=>{ sbPullData && sbPullData(true); }, 800);
       // Refresh do perfil após login — aplica qualquer alteração de licença do admin
