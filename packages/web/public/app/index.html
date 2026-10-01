@@ -480,6 +480,7 @@ tbody tr:last-child td{border-bottom:none}
 <!-- TOPBAR -->
 <div class="topbar">
   <div><div class="topbar-title" id="tb-title">Dashboard</div><div class="topbar-sub" id="tb-sub">Visão geral do negócio</div></div>
+  <span class="sync-pending-badge" onclick="flushSyncQueue && flushSyncQueue()" title="Clique para tentar sincronizar agora" style="display:none;cursor:pointer;font-size:11px;font-weight:600;color:var(--amber);background:var(--amber-bg);border:1px solid rgba(245,158,11,.3);border-radius:999px;padding:5px 12px;margin-right:8px;white-space:nowrap;align-self:center"></span>
   <div class="topbar-right" id="tb-actions"></div>
 </div>
 
@@ -941,6 +942,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="card">
         <div class="card-header"><div class="card-title">💾 Armazenamento e backups</div></div>
         <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+          <div id="sync-queue-info" style="display:none"></div>
           <div style="background:var(--bg3);border-radius:var(--rsm);padding:14px;font-size:12px">
             <div style="font-weight:500;margin-bottom:8px">Estado do armazenamento</div>
             <div style="color:var(--text2)" id="storage-info">A calcular...</div>
@@ -1476,6 +1478,7 @@ function load(){
   loadNotificacoes();
   loadLicenseClients();
   loadStockMovimentos();
+  updateSyncPendingUI && updateSyncPendingUI();
 }
 
 function save(){
@@ -1722,7 +1725,7 @@ function saveDraft(){
   save(); closePanel('ov-fat'); toast('Rascunho guardado');
   // CORRIGIDO: auto-sync Supabase
   const session=JSON.parse(localStorage.getItem('ag_session')||'null');
-  sbSyncRecord('faturas',{...f,user_id:getAuthUserId()||'local',updated_at:new Date().toISOString()});
+  sbSyncRecord('faturas',{...f,updated_at:new Date().toISOString()});
   if(document.getElementById('page-faturas').classList.contains('active')) renderFaturas();
 }
 
@@ -1734,7 +1737,7 @@ function emitFatura(){
   save(); closePanel('ov-fat'); toast('Factura emitida com sucesso! ✓');
   // CORRIGIDO: auto-sync Supabase
   const session=JSON.parse(localStorage.getItem('ag_session')||'null');
-  sbSyncRecord('faturas',{...f,user_id:getAuthUserId()||'local',updated_at:new Date().toISOString()});
+  sbSyncRecord('faturas',{...f,updated_at:new Date().toISOString()});
   nav('faturas');
 }
 
@@ -1783,7 +1786,7 @@ function markPaid(id){
     renderFaturas();
     toast('Factura marcada como paga ✓');
     const _s=JSON.parse(localStorage.getItem('ag_session')||'null');
-    sbSyncRecord('faturas',{...f,user_id:getAuthUserId()||'local',updated_at:new Date().toISOString()});
+    sbSyncRecord('faturas',{...f,updated_at:new Date().toISOString()});
   }
 }
 function deleteFatura(id){
@@ -1872,7 +1875,7 @@ function saveProduto(){
   produtos.push(p); save(); closePanel('ov-prod'); toast('Produto guardado ✓');
   // CORRIGIDO: auto-sync Supabase
   const _sessP=JSON.parse(localStorage.getItem('ag_session')||'null');
-  sbSyncRecord('produtos',{...p,user_id:getAuthUserId()||'local',updated_at:new Date().toISOString()});
+  sbSyncRecord('produtos',{...p,updated_at:new Date().toISOString()});
   renderProdutos();
 }
 
@@ -2148,22 +2151,31 @@ function openCaixaModal(mode){
   document.getElementById('ov-caixa').classList.add('open');
 }
 
+// Gera um id válido em formato UUID v4 — a tabela "caixa" no Supabase exige
+// que a coluna id seja um UUID real, por isso não pode usar uid() aqui.
+function genCaixaId(){
+  if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  // Polyfill simples de UUID v4 para navegadores muito antigos
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
+    const r=Math.random()*16|0, v=c==='x'?r:(r&0x3|0x8);
+    return v.toString(16);
+  });
+}
+
 async function confirmCaixa(){
   const valor=Number(document.getElementById('caixa-valor').value||0);
   const obs=document.getElementById('caixa-obs').value.trim();
   if(valor<0){ toast('Informe um valor válido','error'); return; }
-  const userId = getAuthUserId();
   if(caixaMode==='open'){
     const now=new Date().toISOString();
-    caixaAtual={id:uid(),status:'open',openedAt:now,operador:operadorAtual(),valorInicial:valor,vendas:0,numVendas:0,pagamentos:{Dinheiro:0,Multicaixa:0,Transferência:0,Crédito:0},obsOpen:obs};
-    const mov={id:uid(),caixaId:caixaAtual.id,tipo:'abertura',ref:'Caixa aberta',pagamento:'Dinheiro',valor,data:now,estado:'Aberta'};
+    const cxId=genCaixaId();
+    caixaAtual={id:cxId,status:'open',openedAt:now,operador:operadorAtual(),valorInicial:valor,vendas:0,numVendas:0,pagamentos:{Dinheiro:0,Multicaixa:0,Transferência:0,Crédito:0},obsOpen:obs};
+    const mov={id:uid(),caixaId:cxId,tipo:'abertura',ref:'Caixa aberta',pagamento:'Dinheiro',valor,data:now,estado:'Aberta'};
     caixa.unshift(mov);
     save(); closePanel('ov-caixa'); toast('Caixa aberta ✓'); renderPOS();
-    // Sync Supabase
-    try{
-      const rec={ id: caixaAtual.id, user_id: userId, data: now.slice(0,10), abertura: valor, status: 'aberta', notas: obs, updated_at: now };
-      await sbSyncRecord('caixa', rec);
-    }catch(e){ console.warn('Supabase caixa sync:', e); }
+    // Sync Supabase (id é UUID válido; tabela "caixa" não tem coluna updated_at)
+    const rec={ id: cxId, data: now.slice(0,10), abertura: valor, status: 'aberta', notas: obs };
+    await sbSyncRecord('caixa', rec);
     return;
   }
   if(!caixaAberta()){ toast('Não há caixa aberta','error'); return; }
@@ -2173,19 +2185,18 @@ async function confirmCaixa(){
   const estado=Math.abs(diferenca)<0.01?'Certo':diferenca>0?'Sobra':'Falta';
   const mov={id:uid(),caixaId:caixaAtual.id,tipo:'fecho',ref:`${caixaAtual.numVendas||0} venda(s)`,pagamento:'Dinheiro',valor,data:now,estado,totalVendas:caixaAtual.vendas||0,diferenca,obs};
   caixa.unshift(mov);
-  // Sync fecho no Supabase
-  try{
-    const cfg = window.ALDINA_SUPABASE || {};
-    const base = _sbEffectiveUrl(cfg);
-    const token = await getValidSBToken();
-    if(base && token){
-      await fetch(base+'/rest/v1/caixa?id=eq.'+caixaAtual.id, {
-        method:'PATCH',
-        headers:{'apikey':cfg.anonKey,'Authorization':'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body: JSON.stringify({ fechamento: valor, status: 'fechada', totalVendas: caixaAtual.vendas||0, notas: obs, updated_at: now })
-      });
-    }
-  }catch(e){ console.warn('Supabase caixa fecho sync:', e); }
+  // Sync fecho no Supabase — reenvia o registo completo (upsert por id via merge-duplicates).
+  // Coluna real é "totalvendas" (minúsculas); a tabela não tem coluna "updated_at".
+  // sbSyncRecord já enfileira automaticamente se não houver sessão válida ou a rede falhar.
+  await sbSyncRecord('caixa', {
+    id: caixaAtual.id,
+    data: (caixaAtual.openedAt||now).slice(0,10),
+    abertura: caixaAtual.valorInicial||0,
+    fechamento: valor,
+    status: 'fechada',
+    totalvendas: caixaAtual.vendas||0,
+    notas: obs
+  });
   caixaAtual=null;
   save(); closePanel('ov-caixa'); clearPOSCart(); toast(`Caixa fechada: ${estado}`); renderPOS();
 }
@@ -4161,7 +4172,7 @@ function saveContact(){
         updatedAt:new Date().toISOString()
       };
       save(); closePanel('ov-contact'); toast('Contacto actualizado ✓');
-      sbSyncRecord('contatos',{...contatos[idx],user_id:getAuthUserId()||'local',updated_at:new Date().toISOString()});
+      sbSyncRecord('contatos',{...contatos[idx],updated_at:new Date().toISOString()});
       window._editContactId = null;
       renderClientes(); renderFornecedores();
       return;
@@ -4178,7 +4189,7 @@ function saveContact(){
     status:'active', createdAt:new Date().toISOString()
   };
   contatos.push(c); save(); closePanel('ov-contact'); toast('Contacto guardado ✓');
-  sbSyncRecord('contatos',{...c,user_id:getAuthUserId()||'local',updated_at:new Date().toISOString()});
+  sbSyncRecord('contatos',{...c,updated_at:new Date().toISOString()});
   renderClientes(); renderFornecedores();
 }
 
@@ -4246,7 +4257,7 @@ function saveMovimentoStock(){
   toast(`${tipoLbl[tipo]}: ${p.nome} → ${novoStk} unidades ✓`);
   renderStock();
   // sync Supabase
-  sbSyncRecord('stock_movimentos', {...mov, user_id: getAuthUserId()||'local'});
+  sbSyncRecord('stock_movimentos', {...mov});
 }
 
 // ========== EXPORTAR P&L PDF ==========
@@ -4597,20 +4608,80 @@ async function testSupabase(){
   }
 }
 
-// Sync individual de um registo para o Supabase
-async function sbSyncRecord(table, record){
+// ===== FILA DE SINCRONIZAÇÃO PENDENTE =====
+// Guarda registos que não puderam ser enviados ao Supabase (sem sessão válida
+// no momento, ou falha de rede) para reenviar automaticamente depois — nunca
+// escreve um user_id inválido (ex: a string "local") na base de dados online.
+const SYNC_QUEUE_KEY = 'ag_sync_queue';
+
+function getSyncQueue(){ try{ return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY)||'[]'); }catch{ return []; } }
+function setSyncQueue(q){ localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(q)); updateSyncPendingUI(); }
+function queueSyncRecord(table, record){
+  const q = getSyncQueue();
+  q.push({ table, record, queuedAt: new Date().toISOString() });
+  setSyncQueue(q);
+}
+
+// Actualiza o indicador visível de registos pendentes de sincronização (topbar + página Dados)
+function updateSyncPendingUI(){
+  const n = getSyncQueue().length;
+  document.querySelectorAll('.sync-pending-badge').forEach(el=>{
+    if(n>0){ el.style.display=''; el.textContent = '☁ '+n+' registo'+(n===1?'':'s')+' por sincronizar'; }
+    else { el.style.display='none'; }
+  });
+}
+
+// Envio directo ao Supabase, sem enfileirar em caso de falha (usado internamente)
+async function sbSyncRecordRaw(table, record){
   const cfg = window.ALDINA_SUPABASE || {};
   const base = _sbEffectiveUrl(cfg);
   const token = await getValidSBToken();
-  if(!base || !token) return;
+  if(!base || !token) return false;
   try{
     const res = await fetch(base + '/rest/v1/' + table, {
       method: 'POST',
       headers: { 'apikey': cfg.anonKey, 'Authorization':'Bearer '+token, 'Content-Type':'application/json', 'Prefer':'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(record)
     });
-    if(!res.ok){ const b=await res.json().catch(()=>({})); console.warn('sbSyncRecord error',table,res.status,b); }
-  }catch(e){ console.warn('Supabase sync error:', e); }
+    if(!res.ok){ const b=await res.json().catch(()=>({})); console.warn('sbSyncRecordRaw error',table,res.status,b); return false; }
+    return true;
+  }catch(e){ console.warn('Supabase sync error:', e); return false; }
+}
+
+// Sync individual de um registo para o Supabase.
+// Se não houver utilizador autenticado válido, ou se o pedido falhar,
+// o registo fica em fila local e é reenviado automaticamente mais tarde
+// (após login ou pela verificação periódica) — nunca grava user_id "local".
+async function sbSyncRecord(table, record){
+  const userId = getAuthUserId();
+  if(!userId){
+    queueSyncRecord(table, {...record, user_id: null});
+    return false;
+  }
+  const rec = {...record, user_id: userId};
+  const ok = await sbSyncRecordRaw(table, rec);
+  if(!ok){
+    queueSyncRecord(table, rec);
+    toast('⚠ Sem ligação à nuvem. Guardado no dispositivo — será sincronizado automaticamente.','error');
+  }
+  return ok;
+}
+
+// Tenta reenviar todos os registos pendentes na fila local (chamado após login e periodicamente)
+async function flushSyncQueue(){
+  const userId = getAuthUserId();
+  if(!userId) return;
+  const q = getSyncQueue();
+  if(!q.length) return;
+  const remaining = [];
+  let sentCount = 0;
+  for(const item of q){
+    const rec = {...item.record, user_id: userId};
+    const ok = await sbSyncRecordRaw(item.table, rec);
+    if(ok) sentCount++; else remaining.push(item);
+  }
+  setSyncQueue(remaining);
+  if(sentCount>0) toast(sentCount+' registo'+(sentCount===1?'':'s')+' pendente'+(sentCount===1?'':'s')+' sincronizado'+(sentCount===1?'':'s')+' com a nuvem ✓');
 }
 
 // Sync completo para o Supabase
@@ -4766,6 +4837,17 @@ function renderDados(){
       <div style="background:var(--bg4);border-radius:var(--rsm);padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--amber)">${produtos.length}</div><div style="font-size:10px;color:var(--text3)">Produtos</div></div>
       <div style="background:var(--bg4);border-radius:var(--rsm);padding:10px;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--blue)">${(total/1024).toFixed(1)} KB</div><div style="font-size:10px;color:var(--text3)">Armazenamento</div></div>
     </div>`;
+  const pendQ = getSyncQueue();
+  const pendEl = document.getElementById('sync-queue-info');
+  if(pendEl){
+    if(pendQ.length){
+      pendEl.style.display='';
+      pendEl.innerHTML = `<div style="background:var(--amber-bg);border:1px solid rgba(245,158,11,.3);border-radius:var(--rsm);padding:10px 12px;font-size:12px;color:var(--amber);display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+        <span>⚠ ${pendQ.length} registo${pendQ.length===1?'':'s'} ainda não sincronizado${pendQ.length===1?'':'s'} com a nuvem (só existe${pendQ.length===1?'':'m'} neste dispositivo)</span>
+        <button class="btn btn-sm" style="background:var(--amber);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap" onclick="flushSyncQueue()">Tentar agora</button>
+      </div>`;
+    } else { pendEl.style.display='none'; pendEl.innerHTML=''; }
+  }
   const receita=faturas.filter(f=>f.status==='paid').reduce((s,f)=>s+Number(f.total||0),0);
   document.getElementById('sys-stats').innerHTML=`
     <div style="display:flex;flex-direction:column;gap:8px">
@@ -4812,10 +4894,14 @@ document.addEventListener('DOMContentLoaded', function(){
       renderDashboard();
     }
     setTimeout(()=>{ sbPullData && sbPullData(true); }, 800);
+    // Reenviar para o Supabase qualquer registo que tenha ficado pendente (ex: criado sem ligação)
+    setTimeout(()=>{ updateSyncPendingUI(); flushSyncQueue && flushSyncQueue(); }, 1200);
     // Refresh silencioso do perfil Supabase ao arrancar — garante que alterações do admin são vistas
     setTimeout(()=>{ refreshLicenseFromServer && refreshLicenseFromServer(); }, 2000);
     // Poll contínuo — detecta alterações do admin em tempo quase-real
     setTimeout(()=>{ startClientLicensePoll && startClientLicensePoll(); }, 3000);
+    // Verificação periódica da fila de sincronização pendente (a cada 2 minutos)
+    setInterval(()=>{ flushSyncQueue && flushSyncQueue(); }, 120000);
   }
 });
 
@@ -4971,6 +5057,8 @@ async function ilDoLogin(){
       }
       hideAppLoader();
       setTimeout(()=>{ sbPullData && sbPullData(true); }, 800);
+      // Reenviar para o Supabase qualquer registo criado antes do login (ficou em fila local)
+      setTimeout(()=>{ updateSyncPendingUI(); flushSyncQueue && flushSyncQueue(); }, 1200);
       // Refresh do perfil após login — aplica qualquer alteração de licença do admin
       setTimeout(()=>{ refreshLicenseFromServer && refreshLicenseFromServer(); }, 1500);
       // Iniciar poll contínuo de licença
