@@ -4629,6 +4629,29 @@ function updateSyncPendingUI(){
     if(n>0){ el.style.display=''; el.textContent = '☁ '+n+' registo'+(n===1?'':'s')+' por sincronizar'; }
     else { el.style.display='none'; }
   });
+  updateSyncStatusLabel();
+}
+
+// Mostra o estado real de sincronização junto ao logo, em vez do texto fixo
+// "dados locais" que ficava lá sempre — mesmo quando a conta estava
+// sincronizada com a nuvem — e confundia o utilizador.
+function updateSyncStatusLabel(){
+  const el = document.getElementById('sb-version');
+  if(!el) return;
+  const uid = getAuthUserId ? getAuthUserId() : null;
+  if(!uid){
+    el.textContent = 'modo local · sem conta';
+    el.style.color = '';
+    return;
+  }
+  const n = getSyncQueue().length;
+  if(n>0){
+    el.textContent = '☁ a sincronizar · '+n+' pendente'+(n===1?'':'s');
+    el.style.color = 'var(--warn, #d97706)';
+  } else {
+    el.textContent = '☁ sincronizado com a nuvem';
+    el.style.color = 'var(--ok, #16a34a)';
+  }
 }
 
 // Envio directo ao Supabase, sem enfileirar em caso de falha (usado internamente)
@@ -4727,6 +4750,24 @@ async function sbSyncAll(){
   }
 }
 
+// Combina registos locais com os vindos da nuvem por "id", sem nunca perder
+// um registo que só existe localmente (ex: criado offline e ainda a caminho
+// da fila de sincronização). Em caso de conflito (mesmo id dos dois lados),
+// fica o mais recente por updated_at/createdAt — por defeito o da nuvem.
+function _mergeById(local, cloud){
+  const map = new Map();
+  (Array.isArray(local)?local:[]).forEach(item=>{ if(item && item.id!=null) map.set(item.id, item); });
+  (Array.isArray(cloud)?cloud:[]).forEach(item=>{
+    if(!item || item.id==null) return;
+    const existing = map.get(item.id);
+    if(!existing){ map.set(item.id, item); return; }
+    const tLocal = Date.parse(existing.updated_at||existing.updatedAt||existing.createdAt||existing.data||0)||0;
+    const tCloud = Date.parse(item.updated_at||item.updatedAt||item.createdAt||item.data||0)||0;
+    map.set(item.id, tCloud >= tLocal ? item : existing);
+  });
+  return Array.from(map.values());
+}
+
 // Pull (descarregar dados do Supabase)
 async function sbPullData(silent=false){
   const userId = getAuthUserId();
@@ -4753,18 +4794,39 @@ async function sbPullData(silent=false){
     const c = cRes.ok ? await cRes.json() : [];
     const p = pRes.ok ? await pRes.json() : [];
     const d = dRes.ok ? await dRes.json() : [];
+    // "caixa" na nuvem guarda SESSÕES de caixa (abertura/fecho), com uma forma
+    // diferente do array local "caixa" (que guarda o extracto de movimentos:
+    // abertura/fecho/vendas). Nunca substituir um pelo outro — isso apagava
+    // vendas feitas no POS que só existiam localmente. Lê-se apenas para a
+    // contagem de registos no resumo.
     const cx = cxRes.ok ? await cxRes.json() : [];
-    if(f?.length){ faturas=f; DB.set('faturas',faturas); }
-    if(c?.length){ contatos=c; DB.set('contatos',contatos); }
-    if(p?.length){ produtos=p; DB.set('produtos',produtos); }
-    if(d?.length){ despesas=d; DB.set('despesas',despesas); }
-    if(cx?.length){ caixa=cx; DB.set('caixa',caixa); }
+    // Faturas, contactos, produtos e despesas: combinar em vez de substituir,
+    // para nunca perder algo criado neste dispositivo que ainda não chegou à
+    // nuvem (ex: ficou em fila por falha de rede) e para trazer o que outro
+    // dispositivo já sincronizou.
+    if(f){ faturas=_mergeById(faturas, f); DB.set('faturas',faturas); }
+    if(c){ contatos=_mergeById(contatos, c); DB.set('contatos',contatos); }
+    if(p){ produtos=_mergeById(produtos, p); DB.set('produtos',produtos); }
+    if(d){ despesas=_mergeById(despesas, d); DB.set('despesas',despesas); }
+    // "caixa" local (extracto de movimentos POS) propositadamente NÃO é
+    // substituído aqui — ver nota acima.
     save();
+    updateSyncPendingUI && updateSyncPendingUI();
     if(!silent){
       toast('Dados actualizados ✓ ('+(( f?.length||0)+(c?.length||0)+(p?.length||0)+(d?.length||0)+(cx?.length||0))+' registos)');
       nav('dashboard');
     } else {
-      renderDashboard && renderDashboard();
+      // Re-renderizar a página aberta (clientes, produtos, stock...) para o
+      // utilizador ver logo o que veio de outro dispositivo.
+      try{
+        const ap = document.querySelector('.page.active');
+        const pg = ap && ap.id ? ap.id.replace(/^page-/,'') : 'dashboard';
+        const rmap = { dashboard:renderDashboard, faturas:renderFaturas, clientes:renderClientes,
+          fornecedores:renderFornecedores, stock:renderStock, produtos:renderProdutos,
+          despesas:renderDespesas, pl:renderPL };
+        if(rmap[pg]) rmap[pg]();
+        else renderDashboard && renderDashboard();
+      }catch(_){}
       updateBadges && updateBadges();
     }
   }catch(e){
@@ -4902,8 +4964,26 @@ document.addEventListener('DOMContentLoaded', function(){
     setTimeout(()=>{ startClientLicensePoll && startClientLicensePoll(); }, 3000);
     // Verificação periódica da fila de sincronização pendente (a cada 2 minutos)
     setInterval(()=>{ flushSyncQueue && flushSyncQueue(); }, 120000);
+    // Descarregar periodicamente o que outros dispositivos tenham sincronizado
+    // entretanto — sem isto, dois dispositivos com a app aberta ao mesmo tempo
+    // só viam os dados um do outro depois de recarregar/voltar a entrar.
+    setInterval(()=>{ sbPullData && sbPullData(true); }, 45000);
   }
 });
+
+// Sempre que a aba volta a ficar visível ou a ganhar foco (ex: trocar de
+// dispositivo, trocar de separador, voltar ao telemóvel) — tentar logo
+// descarregar o que mudou na nuvem e reenviar o que ficou pendente. Isto
+// cobre o caso de dois dispositivos abertos ao mesmo tempo, cada um só a
+// ver os seus próprios dados até este refresh acontecer.
+function _syncOnReturn(){
+  if(!getAuthUserId || !getAuthUserId()) return;
+  sbPullData && sbPullData(true);
+  flushSyncQueue && flushSyncQueue();
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') _syncOnReturn(); });
+window.addEventListener('focus', _syncOnReturn);
+window.addEventListener('online', _syncOnReturn);
 
 // ===== LOGIN INLINE =====
 function ilShowLogin(){
