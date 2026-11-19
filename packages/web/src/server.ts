@@ -1,4 +1,4 @@
-import app from "./api";
+import app, { pingSupabase } from "./api";
 
 const port = Number(process.env.PORT ?? 3000);
 const distDir = `${import.meta.dir}/../dist`;
@@ -52,3 +52,13 @@ function getStaticFilePath(pathname: string) {
 
   return fullPath;
 }
+
+// Keepalive Supabase: evita a pausa automática do plano gratuito (inactividade ~7 dias).
+// Ping ao arrancar e a cada 6 horas.
+const KEEPALIVE_MS = 6 * 60 * 60 * 1000;
+async function keepalive() {
+  const r = await pingSupabase();
+  console.log(`[keepalive] supabase ${r.ok ? "ok" : "FALHOU"}`, r.status ?? r.error ?? "");
+}
+setTimeout(keepalive, 10_000);
+setInterval(keepalive, KEEPALIVE_MS);

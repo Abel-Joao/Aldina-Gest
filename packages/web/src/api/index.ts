@@ -7,6 +7,18 @@ const SUPABASE_URL = 'https://adzslgrktdundlozmcoa.supabase.co';
 // Usar service_role no proxy para bypass RLS (o proxy é o ponto de segurança)
 const SUPABASE_SVC_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 
+export async function pingSupabase(): Promise<{ ok: boolean; status?: number; error?: string; at: string }> {
+  const at = new Date().toISOString();
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id&limit=1`, {
+      headers: { apikey: SUPABASE_SVC_KEY, Authorization: `Bearer ${SUPABASE_SVC_KEY}` },
+    });
+    return { ok: res.ok, status: res.status, at };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e), at };
+  }
+}
+
 const app = new Hono()
   .basePath('api')
   .use(
@@ -21,6 +33,11 @@ const app = new Hono()
   )
   .get('/ping', (c) => c.json({ message: `Pong! ${Date.now()}` }, 200))
   .get('/health', (c) => c.json({ status: 'ok' }, 200))
+  // Mantém o projecto Supabase (plano gratuito) activo: faz uma leitura real à BD
+  .get('/keepalive', async (c) => {
+    const r = await pingSupabase();
+    return c.json(r, r.ok ? 200 : 502);
+  })
 
   // Endpoint de migration (protegido por secret interno)
   .get('/migrate/telefone', async (c) => {
