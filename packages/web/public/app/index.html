@@ -3463,6 +3463,7 @@ async function logout(){
   localStorage.removeItem('ag_sb_refresh_token');
   localStorage.removeItem('ag_sb_token_exp');
   ilShowLogin();
+  updateSyncStatusLabel && updateSyncStatusLabel();
 }
 
 // ========== CONFIG TABS ==========
@@ -4632,6 +4633,17 @@ function updateSyncPendingUI(){
   updateSyncStatusLabel();
 }
 
+// Sessão antiga (criada por uma versão anterior, sem ligação à conta na nuvem):
+// mantém TODOS os dados locais (fp_*) mas obriga a entrar de novo, para que
+// passem a sincronizar entre dispositivos.
+function forceRelogin(reason){
+  try{
+    ['ag_session','ag_sb_token','ag_sb_refresh_token','ag_sb_token_exp'].forEach(k=>localStorage.removeItem(k));
+  }catch(_){}
+  ilShowLogin();
+  if(reason==='legacy') setTimeout(()=>toast('Sessão antiga — entre novamente para sincronizar com a nuvem. Os seus dados neste dispositivo foram mantidos.'),500);
+}
+
 // Mostra o estado real de sincronização junto ao logo, em vez do texto fixo
 // "dados locais" que ficava lá sempre — mesmo quando a conta estava
 // sincronizada com a nuvem — e confundia o utilizador.
@@ -4640,8 +4652,18 @@ function updateSyncStatusLabel(){
   if(!el) return;
   const uid = getAuthUserId ? getAuthUserId() : null;
   if(!uid){
-    el.textContent = 'modo local · sem conta';
-    el.style.color = '';
+    el.textContent = '⚠ sem sessão · toque para entrar';
+    el.style.color = 'var(--warn, #d97706)';
+    el.style.cursor = 'pointer';
+    el.title = 'Os dados só estão neste dispositivo. Termine a sessão e entre de novo para sincronizar com a nuvem.';
+    el.onclick = ()=>{ if(confirm('Os seus dados só estão neste dispositivo.\n\nQuer entrar de novo agora para sincronizar com a nuvem? (os dados locais são mantidos)')) forceRelogin('manual'); };
+    return;
+  }
+  el.style.cursor = ''; el.onclick = null; el.title = '';
+  if(window._sbLastSyncFailed){
+    el.textContent = '⚠ sem ligação à nuvem';
+    el.style.color = 'var(--danger, #dc2626)';
+    el.title = 'Não foi possível contactar o servidor. Os dados ficam guardados no dispositivo e sincronizam quando a ligação voltar.';
     return;
   }
   const n = getSyncQueue().length;
@@ -4790,10 +4812,13 @@ async function sbPullData(silent=false){
       fetch(base+'/rest/v1/despesas?select=*'+userFilter, { headers }),
       fetch(base+'/rest/v1/caixa?select=*'+userFilter, { headers })
     ]);
-    const f = fRes.ok ? await fRes.json() : [];
-    const c = cRes.ok ? await cRes.json() : [];
-    const p = pRes.ok ? await pRes.json() : [];
-    const d = dRes.ok ? await dRes.json() : [];
+    const allOk = fRes.ok && cRes.ok && pRes.ok && dRes.ok;
+    window._sbLastSyncFailed = false;
+    const f = fRes.ok ? await fRes.json() : null;
+    const c = cRes.ok ? await cRes.json() : null;
+    const p = pRes.ok ? await pRes.json() : null;
+    const d = dRes.ok ? await dRes.json() : null;
+    if(!allOk) console.warn('Pull parcial:', fRes.status, cRes.status, pRes.status, dRes.status);
     // "caixa" na nuvem guarda SESSÕES de caixa (abertura/fecho), com uma forma
     // diferente do array local "caixa" (que guarda o extracto de movimentos:
     // abertura/fecho/vendas). Nunca substituir um pelo outro — isso apagava
@@ -4810,6 +4835,31 @@ async function sbPullData(silent=false){
     if(d){ despesas=_mergeById(despesas, d); DB.set('despesas',despesas); }
     // "caixa" local (extracto de movimentos POS) propositadamente NÃO é
     // substituído aqui — ver nota acima.
+    // Enviar para a nuvem o que só existe neste dispositivo (ex: criado antes
+    // de entrar com conta, em "modo local"). Só se estes dados pertencerem a
+    // esta conta (ou ainda não tiverem dono), para nunca misturar contas.
+    try{
+      const owner = localStorage.getItem('ag_data_owner');
+      if(!owner || owner===userId){
+        localStorage.setItem('ag_data_owner', userId);
+        const pushOnly = async (table, localArr, cloudArr)=>{
+          if(!Array.isArray(cloudArr)) return;
+          const have = new Set(cloudArr.map(x=>x.id));
+          const rows = (localArr||[]).filter(x=>x && x.id!=null && !have.has(x.id))
+            .map(x=>({...x, user_id:userId, updated_at:new Date().toISOString()}));
+          if(!rows.length) return;
+          const r = await fetch(base+'/rest/v1/'+table, { method:'POST',
+            headers:{ 'apikey':cfg.anonKey, 'Authorization':'Bearer '+token, 'Content-Type':'application/json', 'Prefer':'resolution=merge-duplicates,return=minimal' },
+            body: JSON.stringify(rows) });
+          if(!r.ok) console.warn('push local→nuvem falhou', table, r.status, await r.text().catch(()=>''));
+          else console.info('Enviados para a nuvem', rows.length, table);
+        };
+        await pushOnly('faturas', faturas, f);
+        await pushOnly('contatos', contatos, c);
+        await pushOnly('produtos', produtos, p);
+        await pushOnly('despesas', despesas, d);
+      }
+    }catch(e){ console.warn('push local-only:', e.message); }
     save();
     updateSyncPendingUI && updateSyncPendingUI();
     if(!silent){
@@ -4832,6 +4882,8 @@ async function sbPullData(silent=false){
   }catch(e){
     if(!silent) toast('Erro ao descarregar: '+e.message,'error');
     else console.warn('Supabase pull silencioso falhou:', e.message);
+    window._sbLastSyncFailed = true;
+    updateSyncStatusLabel && updateSyncStatusLabel();
   }
 }
 
@@ -4940,8 +4992,14 @@ document.addEventListener('DOMContentLoaded', function(){
     const ldr=document.getElementById('app-loader');
     if(ldr) ldr.classList.add('hide');
   }, 400);
+  // Sessão antiga sem conta na nuvem (authId) → obrigar a entrar de novo.
+  try{
+    const _s0 = JSON.parse(localStorage.getItem('ag_session')||'null');
+    if(_s0 && !_s0.authId){ forceRelogin('legacy'); return; }
+  }catch(_){}
   if(checkSession()){
     updateBadges();
+    updateSyncStatusLabel();
     const isPOSFullscreen = new URLSearchParams(location.search).get('pos')==='1';
     if(isPOSFullscreen){
       if(hasPOSAccess()){
@@ -5128,6 +5186,7 @@ async function ilDoLogin(){
     load();
     if(checkSession()){
       updateBadges();
+      updateSyncStatusLabel();
       const isPOSFullscreen = new URLSearchParams(location.search).get('pos')==='1';
       if(isPOSFullscreen && hasPOSAccess()){
         document.body.classList.add('pos-fullscreen-mode');
