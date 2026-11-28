@@ -1660,10 +1660,22 @@ function renderDashboard(){
 }
 
 // ========== FATURAS ==========
+// Próximo número de documento: maior sequência já usada (neste dispositivo e,
+// quando conhecido, na nuvem) para o mesmo prefixo+ano, mais 1. Antes usava
+// faturas.length+1, que repetia números entre dispositivos.
+function nextDocNum(prefix, extraNums){
+  const year=new Date().getFullYear();
+  const re=new RegExp('^'+String(prefix).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'-'+year+'/(\\d+)$');
+  let max=0;
+  const all=(faturas||[]).map(f=>f.num).concat(extraNums||[]);
+  all.forEach(n=>{ const m=re.exec(String(n||'')); if(m) max=Math.max(max,parseInt(m[1],10)); });
+  return prefix+'-'+year+'/'+String(max+1).padStart(3,'0');
+}
+
 function openFatura(tipo='FT'){
   editFatId=null; fatItems=[{desc:'',qty:1,price:0,iva:defaultInvoiceIva()}];
   const prefix=tipo==='FT'?invoicePrefix():tipo;
-  const n=prefix+'-'+new Date().getFullYear()+'/'+String(faturas.length+1).padStart(3,'0');
+  const n=nextDocNum(prefix);
   document.getElementById('fat-num').value=n;
   document.getElementById('fat-tipo').value=tipo;
   document.getElementById('fat-moeda').value=defaultInvoiceCurrency();
@@ -1956,6 +1968,7 @@ function renderPOS(){
 }
 
 function renderPOSStats(){
+  caixaRecalc();
   const aberta=caixaAberta();
   const pagamentos=caixaPagamentos();
   const vendas=Number(caixaAtual?.vendas||0);
@@ -2081,48 +2094,60 @@ function renderPOSCart(){
   document.getElementById('pos-total').textContent=fmt(t.total)+' Kz';
 }
 
-function finalizarPOS(){
+let _posBusy=false;
+async function finalizarPOS(){
+  if(_posBusy) return;
   if(!caixaAberta()){ toast('Abra a caixa antes de finalizar a venda','error'); openCaixaModal('open'); return; }
   if(!posCart.length){ toast('Adicione produtos ao carrinho','error'); return; }
-  for(const it of posCart){
-    const p=produtos.find(x=>x.id===it.id);
-    if(!p){ toast('Há um produto removido no carrinho','error'); return; }
-    if(p.tipo!=='service'&&Number(p.stk||0)<Number(it.qty||0)){ toast(`Stock insuficiente: ${p.nome}`,'error'); return; }
-  }
-  const pay=document.getElementById('pos-pay').value;
-  const cliente=document.getElementById('pos-cliente').value.trim()||'Consumidor final';
-  const totals=calcPOSTotals();
-  const items=posCart.map(it=>{
-    const p=produtos.find(x=>x.id===it.id);
-    return {desc:p.nome,qty:Number(it.qty||1),price:Number(p.preco||0),iva:Number(it.iva||0),productId:p.id,sku:p.sku||''};
-  });
-  const f={
-    id:uid(), num:'FR-'+new Date().getFullYear()+'/'+String(faturas.length+1).padStart(3,'0'),
-    tipo:'FR', moeda:'Kz', data:today(), venc:today(), cliente, nif:'', email:'',
-    obs:'Venda POS - Pagamento: '+pay, items, subtotal:totals.sub, ivaTotal:totals.iva,
-    desconto:totals.discount, total:totals.total, status:pay==='Crédito'?'pending':'paid',
-    origem:'pos', pagamento:pay, caixaId:caixaAtual.id, createdAt:new Date().toISOString()
-  };
-  items.forEach(it=>{
-    const p=produtos.find(x=>x.id===it.productId);
-    if(p&&p.tipo!=='service') p.stk=Math.max(0,Number(p.stk||0)-Number(it.qty||0));
-  });
-  faturas.push(f);
-  caixaAtual.vendas=Number(caixaAtual.vendas||0)+totals.total;
-  caixaAtual.numVendas=Number(caixaAtual.numVendas||0)+1;
-  caixaAtual.pagamentos=caixaPagamentos();
-  caixaAtual.pagamentos[pay]=Number(caixaAtual.pagamentos[pay]||0)+totals.total;
-  caixaAtual.updatedAt=new Date().toISOString();
-  caixa.unshift({id:uid(),caixaId:caixaAtual.id,tipo:'venda',ref:f.num,pagamento:pay,valor:totals.total,data:f.createdAt,estado:f.status==='paid'?'Paga':'Pendente'});
-  save();
-  clearPOSCart();
-  document.getElementById('pos-cliente').value='';
-  toast('Venda finalizada e stock actualizado ✓');
-  renderPOS();
+  _posBusy=true;
+  try{
+    // Estado fresco da nuvem antes de vender: a caixa pode ter sido fechada noutro
+    // dispositivo, o stock pode ter mudado e o número da fatura pode já estar usado.
+    const fresh = await sbFreshState(posCart.map(it=>it.id));
+    if(!caixaAberta()){ toast('A caixa foi fechada noutro dispositivo. Abra a caixa para continuar.','error'); renderPOS(); openCaixaModal('open'); return; }
+    for(const it of posCart){
+      const p=produtos.find(x=>x.id===it.id);
+      if(!p){ toast('Há um produto removido no carrinho','error'); return; }
+      if(p.tipo!=='service'&&Number(p.stk||0)<Number(it.qty||0)){ toast(`Stock insuficiente: ${p.nome}`,'error'); renderPOS(); return; }
+    }
+    const pay=document.getElementById('pos-pay').value;
+    const cliente=document.getElementById('pos-cliente').value.trim()||'Consumidor final';
+    const totals=calcPOSTotals();
+    const items=posCart.map(it=>{
+      const p=produtos.find(x=>x.id===it.id);
+      return {desc:p.nome,qty:Number(it.qty||1),price:Number(p.preco||0),iva:Number(it.iva||0),productId:p.id,sku:p.sku||''};
+    });
+    const nowIso=new Date().toISOString();
+    const f={
+      id:uid(), num:nextDocNum('FR', fresh.nums),
+      tipo:'FR', moeda:'Kz', data:today(), venc:today(), cliente, nif:'', email:'',
+      obs:'Venda POS - Pagamento: '+pay, items, subtotal:totals.sub, ivaTotal:totals.iva,
+      desconto:totals.discount, total:totals.total, status:pay==='Crédito'?'pending':'paid',
+      origem:'pos', pagamento:pay, caixaId:caixaAtual.id, createdAt:nowIso, updated_at:nowIso
+    };
+    const changed=[];
+    items.forEach(it=>{
+      const p=produtos.find(x=>x.id===it.productId);
+      if(p&&p.tipo!=='service'){ p.stk=Math.max(0,Number(p.stk||0)-Number(it.qty||0)); p.updated_at=nowIso; changed.push(p); }
+    });
+    faturas.push(f);
+    caixaRecalc();
+    caixaAtual.updatedAt=nowIso;
+    caixa.unshift({id:uid(),caixaId:caixaAtual.id,tipo:'venda',ref:f.num,pagamento:pay,valor:totals.total,data:f.createdAt,estado:f.status==='paid'?'Paga':'Pendente'});
+    save();
+    clearPOSCart();
+    document.getElementById('pos-cliente').value='';
+    toast('Venda finalizada e stock actualizado ✓');
+    renderPOS();
+    // Enviar para a nuvem: fatura + stock dos produtos vendidos (fica visível nos outros dispositivos)
+    sbSyncRecord('faturas', {...f});
+    changed.forEach(p=>sbSyncRecord('produtos', {...p}));
+  } finally { _posBusy=false; }
 }
 
 function openCaixaModal(mode){
   caixaMode=mode;
+  caixaRecalc();
   const aberta=caixaAberta();
   if(mode==='open'&&aberta){ toast('A caixa já está aberta','error'); return; }
   if(mode==='close'&&!aberta){ toast('Não há caixa aberta para fechar','error'); return; }
@@ -2162,43 +2187,194 @@ function genCaixaId(){
   });
 }
 
+// ===== CAIXA PARTILHADA ENTRE DISPOSITIVOS =====
+// A sessão de caixa vive na tabela "caixa" da nuvem (id uuid, status aberta/fechada).
+// Os detalhes que não têm coluna própria (operador, hora, estado do fecho, ...)
+// vão em JSON no campo "notas". Os totais (vendas, nº de vendas, pagamentos) NUNCA
+// são contadores: calculam-se sempre a partir das faturas POS dessa caixa, para
+// dois dispositivos a vender ao mesmo tempo não se sobreporem.
+function caixaParseNotas(n){
+  try{ const o=JSON.parse(n); if(o && typeof o==='object' && o.v===1) return o; }catch(_){}
+  return {v:1, obs:(typeof n==='string'?n:'')};
+}
+
+function caixaRecalc(){
+  if(!caixaAtual) return;
+  const pg={Dinheiro:0,Multicaixa:0,'Transferência':0,'Crédito':0};
+  let v=0,n=0;
+  faturas.forEach(f=>{
+    if(f && f.origem==='pos' && f.caixaId===caixaAtual.id){
+      const t=Number(f.total||0); v+=t; n++; pg[f.pagamento]=(pg[f.pagamento]||0)+t;
+    }
+  });
+  caixaAtual.vendas=v; caixaAtual.numVendas=n; caixaAtual.pagamentos=pg;
+}
+
+function caixaSyncRow(cx, fecho){
+  const env={v:1, operador:cx.operador, openedAt:cx.openedAt, valorInicial:Number(cx.valorInicial||0), obs:cx.obsOpen||''};
+  const rec={ id:cx.id, data:(cx.openedAt||new Date().toISOString()).slice(0,10), abertura:Number(cx.valorInicial||0), status:'aberta' };
+  if(fecho){
+    Object.assign(env,{closedAt:fecho.closedAt, estado:fecho.estado, diferenca:fecho.diferenca, obsFecho:fecho.obs||'', numVendas:fecho.numVendas||0});
+    rec.status='fechada'; rec.fechamento=fecho.valor; rec.totalvendas=fecho.totalVendas;
+  }
+  rec.notas=JSON.stringify(env);
+  return sbSyncRecord('caixa', rec);
+}
+
+// Compara as sessões de caixa da nuvem com o estado local e ajusta:
+//  - caixa aberta noutro dispositivo → abre aqui também;
+//  - caixa fechada noutro dispositivo → fecha aqui;
+//  - reconstrói o extracto de movimentos (sem duplicados).
+// Devolve {changed, closedElsewhere, adopted}.
+function caixaReconcile(rows){
+  const out={changed:false, closedElsewhere:false, adopted:false};
+  if(!Array.isArray(rows)) return out;
+  const pendingIds=new Set(getSyncQueue().filter(q=>q.table==='caixa').map(q=>q.record&&q.record.id));
+  const mvKey=m=>m.tipo==='venda' ? 'v|'+m.caixaId+'|'+m.ref : m.tipo+'|'+m.caixaId;
+  let have=new Set(caixa.map(mvKey));
+  const add=m=>{ const k=mvKey(m); if(!have.has(k)){ have.add(k); caixa.push(m); out.changed=true; } };
+  const anuladas=new Set(rows.filter(r=>caixaParseNotas(r.notas).estado==='Anulada').map(r=>r.id));
+  if(anuladas.size && caixa.some(m=>anuladas.has(m.caixaId))){ caixa=caixa.filter(m=>!anuladas.has(m.caixaId)); have=new Set(caixa.map(mvKey)); out.changed=true; }
+  rows.forEach(r=>{
+    if(anuladas.has(r.id)) return;
+    const e=caixaParseNotas(r.notas);
+    const openedAt=e.openedAt||r.created_at||r.data;
+    add({id:'mv-ab-'+r.id,caixaId:r.id,tipo:'abertura',ref:'Caixa aberta',pagamento:'Dinheiro',valor:Number(r.abertura||0),data:openedAt,estado:'Aberta'});
+    if(r.status==='fechada') add({id:'mv-fe-'+r.id,caixaId:r.id,tipo:'fecho',ref:(e.numVendas||0)+' venda(s)',pagamento:'Dinheiro',valor:Number(r.fechamento||0),data:e.closedAt||openedAt,estado:e.estado||'Certo',totalVendas:Number(r.totalvendas||0),diferenca:Number(e.diferenca||0),obs:e.obsFecho||''});
+  });
+  faturas.forEach(f=>{
+    if(f && f.origem==='pos' && f.caixaId)
+      add({id:'mv-v-'+f.id,caixaId:f.caixaId,tipo:'venda',ref:f.num,pagamento:f.pagamento,valor:Number(f.total||0),data:f.createdAt||f.data,estado:f.status==='paid'?'Paga':'Pendente'});
+  });
+  if(out.changed) caixa.sort((a,b)=>(Date.parse(b.data)||0)-(Date.parse(a.data)||0));
+
+  const closedLocal=new Set(caixa.filter(m=>m.tipo==='fecho').map(m=>m.caixaId));
+  const openedAtOf=r=>Date.parse(caixaParseNotas(r.notas).openedAt||r.created_at||r.data)||0;
+  const abertas=rows.filter(r=>r.status==='aberta' && !closedLocal.has(r.id)).sort((a,b)=>openedAtOf(a)-openedAtOf(b));
+  const adopt=r=>{
+    const e=caixaParseNotas(r.notas);
+    caixaAtual={id:r.id,status:'open',openedAt:e.openedAt||r.created_at||new Date().toISOString(),operador:e.operador||'Operador',valorInicial:Number(r.abertura||0),vendas:0,numVendas:0,pagamentos:{Dinheiro:0,Multicaixa:0,'Transferência':0,'Crédito':0},obsOpen:e.obs||''};
+    caixaRecalc(); out.changed=true; out.adopted=true;
+  };
+
+  if(caixaAtual && caixaAtual.status==='open'){
+    const r=rows.find(x=>x.id===caixaAtual.id);
+    if(r && r.status==='fechada' && !pendingIds.has(r.id)){
+      caixaAtual=null; out.changed=true; out.closedElsewhere=true;
+    } else if(!r){
+      caixaSyncRow(caixaAtual);   // ainda não chegou à nuvem
+    } else if(abertas.length && abertas[0].id!==caixaAtual.id){
+      // Duas caixas abertas ao mesmo tempo (dois dispositivos abriram em simultâneo):
+      // prevalece a mais antiga. Esta só é abandonada se ainda não tiver vendas.
+      caixaRecalc();
+      const mine=openedAtOf(r), other=openedAtOf(abertas[0]);
+      if(other<mine && !caixaAtual.numVendas){
+        const dup=caixaAtual;
+        caixaSyncRow(dup,{closedAt:new Date().toISOString(),estado:'Anulada',diferenca:0,valor:0,totalVendas:0,numVendas:0});
+        caixa=caixa.filter(m=>m.caixaId!==dup.id);
+        adopt(abertas[0]); out.closedElsewhere=false;
+      } else caixaRecalc();
+    } else caixaRecalc();
+  } else if(abertas.length){
+    adopt(abertas[0]);
+  }
+  return out;
+}
+
+// Vai buscar à nuvem o estado actual da caixa (+ stock dos produtos indicados e
+// números de fatura FR) e aplica-o localmente. Tolerante a falhas: sem rede ou sem
+// sessão simplesmente devolve o que já existe neste dispositivo.
+async function sbFreshState(productIds){
+  const res={ok:false, nums:[]};
+  try{
+    const userId=getAuthUserId();
+    const cfg=window.ALDINA_SUPABASE||{};
+    const base=_sbEffectiveUrl(cfg);
+    const token=await getValidSBToken();
+    if(!userId||!base||!token) return res;
+    const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),4000);
+    const H={apikey:cfg.anonKey,Authorization:'Bearer '+token,Accept:'application/json'};
+    const uf='&user_id=eq.'+encodeURIComponent(userId);
+    const year=new Date().getFullYear();
+    const reqs=[
+      fetch(base+'/rest/v1/caixa?select=*'+uf,{headers:H,signal:ctl.signal}),
+      fetch(base+'/rest/v1/faturas?select=num&num=like.'+encodeURIComponent('FR-'+year+'/*')+uf,{headers:H,signal:ctl.signal})
+    ];
+    const ids=(productIds||[]).filter(Boolean);
+    if(ids.length) reqs.push(fetch(base+'/rest/v1/produtos?select=id,stk,updated_at&id=in.('+ids.map(i=>'"'+String(i).replace(/"/g,'')+'"').join(',')+')'+uf,{headers:H,signal:ctl.signal}));
+    const rr=await Promise.all(reqs);
+    clearTimeout(to);
+    if(rr[0].ok){
+      const rows=(await rr[0].json()).filter(r=>!r.user_id||r.user_id===userId);
+      res.rows=rows;
+      const wasOpen=caixaAberta();
+      const o=caixaReconcile(rows);
+      if(o.changed){ save(); }
+      if(o.closedElsewhere) toast('A caixa foi fechada noutro dispositivo','error');
+      else if(o.adopted && !wasOpen) toast('Caixa aberta noutro dispositivo — sincronizada ✓');
+      res.ok=true;
+    }
+    if(rr[1].ok) res.nums=(await rr[1].json()).map(x=>x.num);
+    // Vendas da caixa aberta feitas noutros dispositivos: necessárias para totais certos (fecho incluído).
+    if(caixaAberta()){
+      try{
+        const r3=await fetch(base+'/rest/v1/faturas?select=*&caixaId=eq.'+encodeURIComponent(caixaAtual.id)+uf,{headers:H});
+        if(r3.ok){ faturas=_mergeById(faturas, await r3.json(), 'faturas'); caixaRecalc(); if(res.rows) caixaReconcile(res.rows); save(); }
+      }catch(_){}
+    }
+    if(rr[2] && rr[2].ok){
+      const pend=new Set(getSyncQueue().filter(q=>q.table==='produtos').map(q=>q.record&&q.record.id));
+      (await rr[2].json()).forEach(cp=>{
+        const lp=produtos.find(x=>x.id===cp.id);
+        if(lp && !pend.has(lp.id) && cp.stk!=null) lp.stk=Number(cp.stk);
+      });
+      save();
+    }
+  }catch(e){ console.warn('sbFreshState:', e.message); }
+  return res;
+}
+
+async function caixaRefresh(){
+  const r=await sbFreshState([]);
+  const ap=document.querySelector('.page.active');
+  if(ap && ap.id==='page-pos') renderPOS();
+  return r;
+}
+
 async function confirmCaixa(){
   const valor=Number(document.getElementById('caixa-valor').value||0);
   const obs=document.getElementById('caixa-obs').value.trim();
   if(valor<0){ toast('Informe um valor válido','error'); return; }
-  if(caixaMode==='open'){
+  if(window._caixaBusy) return;
+  window._caixaBusy=true;
+  try{
+    // Antes de abrir/fechar, confirma na nuvem o estado actual (outro dispositivo pode já tê-lo feito).
+    await sbFreshState([]);
+    if(caixaMode==='open'){
+      if(caixaAberta()){ closePanel('ov-caixa'); renderPOS(); toast('A caixa já estava aberta noutro dispositivo — sincronizada ✓'); return; }
+      const now=new Date().toISOString();
+      const cxId=genCaixaId();
+      caixaAtual={id:cxId,status:'open',openedAt:now,operador:operadorAtual(),valorInicial:valor,vendas:0,numVendas:0,pagamentos:{Dinheiro:0,Multicaixa:0,'Transferência':0,'Crédito':0},obsOpen:obs};
+      const mov={id:uid(),caixaId:cxId,tipo:'abertura',ref:'Caixa aberta',pagamento:'Dinheiro',valor,data:now,estado:'Aberta'};
+      caixa.unshift(mov);
+      save(); closePanel('ov-caixa'); toast('Caixa aberta ✓'); renderPOS();
+      await caixaSyncRow(caixaAtual);
+      return;
+    }
+    if(!caixaAberta()){ closePanel('ov-caixa'); renderPOS(); toast('A caixa já foi fechada noutro dispositivo','error'); return; }
+    caixaRecalc();
     const now=new Date().toISOString();
-    const cxId=genCaixaId();
-    caixaAtual={id:cxId,status:'open',openedAt:now,operador:operadorAtual(),valorInicial:valor,vendas:0,numVendas:0,pagamentos:{Dinheiro:0,Multicaixa:0,Transferência:0,Crédito:0},obsOpen:obs};
-    const mov={id:uid(),caixaId:cxId,tipo:'abertura',ref:'Caixa aberta',pagamento:'Dinheiro',valor,data:now,estado:'Aberta'};
+    const esperado=caixaEsperado();
+    const diferenca=valor-esperado;
+    const estado=Math.abs(diferenca)<0.01?'Certo':diferenca>0?'Sobra':'Falta';
+    const mov={id:uid(),caixaId:caixaAtual.id,tipo:'fecho',ref:`${caixaAtual.numVendas||0} venda(s)`,pagamento:'Dinheiro',valor,data:now,estado,totalVendas:caixaAtual.vendas||0,diferenca,obs};
     caixa.unshift(mov);
-    save(); closePanel('ov-caixa'); toast('Caixa aberta ✓'); renderPOS();
-    // Sync Supabase (id é UUID válido; tabela "caixa" não tem coluna updated_at)
-    const rec={ id: cxId, data: now.slice(0,10), abertura: valor, status: 'aberta', notas: obs };
-    await sbSyncRecord('caixa', rec);
-    return;
-  }
-  if(!caixaAberta()){ toast('Não há caixa aberta','error'); return; }
-  const now=new Date().toISOString();
-  const esperado=caixaEsperado();
-  const diferenca=valor-esperado;
-  const estado=Math.abs(diferenca)<0.01?'Certo':diferenca>0?'Sobra':'Falta';
-  const mov={id:uid(),caixaId:caixaAtual.id,tipo:'fecho',ref:`${caixaAtual.numVendas||0} venda(s)`,pagamento:'Dinheiro',valor,data:now,estado,totalVendas:caixaAtual.vendas||0,diferenca,obs};
-  caixa.unshift(mov);
-  // Sync fecho no Supabase — reenvia o registo completo (upsert por id via merge-duplicates).
-  // Coluna real é "totalvendas" (minúsculas); a tabela não tem coluna "updated_at".
-  // sbSyncRecord já enfileira automaticamente se não houver sessão válida ou a rede falhar.
-  await sbSyncRecord('caixa', {
-    id: caixaAtual.id,
-    data: (caixaAtual.openedAt||now).slice(0,10),
-    abertura: caixaAtual.valorInicial||0,
-    fechamento: valor,
-    status: 'fechada',
-    totalvendas: caixaAtual.vendas||0,
-    notas: obs
-  });
-  caixaAtual=null;
-  save(); closePanel('ov-caixa'); clearPOSCart(); toast(`Caixa fechada: ${estado}`); renderPOS();
+    const closing=caixaAtual;
+    caixaAtual=null;
+    save(); closePanel('ov-caixa'); clearPOSCart(); toast(`Caixa fechada: ${estado}`); renderPOS();
+    // sbSyncRecord enfileira automaticamente se não houver sessão válida ou a rede falhar.
+    await caixaSyncRow(closing,{closedAt:now,estado,diferenca,obs,valor,totalVendas:closing.vendas||0,numVendas:closing.numVendas||0});
+  } finally { window._caixaBusy=false; }
 }
 
 function renderPOSMovimentos(){
@@ -4683,13 +4859,28 @@ async function sbSyncRecordRaw(table, record){
   const token = await getValidSBToken();
   if(!base || !token) return false;
   try{
-    const res = await fetch(base + '/rest/v1/' + table, {
-      method: 'POST',
-      headers: { 'apikey': cfg.anonKey, 'Authorization':'Bearer '+token, 'Content-Type':'application/json', 'Prefer':'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(record)
-    });
-    if(!res.ok){ const b=await res.json().catch(()=>({})); console.warn('sbSyncRecordRaw error',table,res.status,b); return false; }
-    return true;
+    // Colunas que a nuvem não conhece (PGRST204) são retiradas e o envio repetido,
+    // para que um campo novo no dispositivo nunca impeça a sincronização do resto.
+    let dropped=[]; try{ dropped=(JSON.parse(localStorage.getItem('ag_sb_dropcols')||'{}')[table])||[]; }catch(_){}
+    let rec={...record}; dropped.forEach(c=>delete rec[c]);
+    for(let attempt=0; attempt<6; attempt++){
+      const res = await fetch(base + '/rest/v1/' + table, {
+        method: 'POST',
+        headers: { 'apikey': cfg.anonKey, 'Authorization':'Bearer '+token, 'Content-Type':'application/json', 'Prefer':'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(rec)
+      });
+      if(res.ok) return true;
+      const b=await res.json().catch(()=>({}));
+      const m = b && b.code==='PGRST204' && /'([^']+)' column/.exec(b.message||'');
+      if(m && m[1] in rec){
+        delete rec[m[1]];
+        try{ const all=JSON.parse(localStorage.getItem('ag_sb_dropcols')||'{}'); all[table]=Array.from(new Set((all[table]||[]).concat(m[1]))); localStorage.setItem('ag_sb_dropcols',JSON.stringify(all)); }catch(_){}
+        console.warn('Coluna desconhecida na nuvem, ignorada:', table, m[1]);
+        continue;
+      }
+      console.warn('sbSyncRecordRaw error',table,res.status,b); return false;
+    }
+    return false;
   }catch(e){ console.warn('Supabase sync error:', e); return false; }
 }
 
@@ -4761,10 +4952,6 @@ async function sbSyncAll(){
       const rows = stockMovimentos.map(m=>({...m, user_id:userId}));
       await fetch(base+'/rest/v1/stock_movimentos', { method:'POST', headers, body:JSON.stringify(rows) });
     }
-    if(caixa.length){
-      const rows = caixa.map(c=>({...c, user_id:userId, updated_at:new Date().toISOString()}));
-      await fetch(base+'/rest/v1/caixa', { method:'POST', headers, body:JSON.stringify(rows) });
-    }
     toast('Sincronização completa ✓ Todos os dados enviados para Supabase.');
   }catch(e){
     toast('Erro de sincronização: '+e.message,'error');
@@ -4776,13 +4963,15 @@ async function sbSyncAll(){
 // um registo que só existe localmente (ex: criado offline e ainda a caminho
 // da fila de sincronização). Em caso de conflito (mesmo id dos dois lados),
 // fica o mais recente por updated_at/createdAt — por defeito o da nuvem.
-function _mergeById(local, cloud){
+function _mergeById(local, cloud, table){
+  const pending = new Set(getSyncQueue().filter(q=>q.table===table).map(q=>q.record&&q.record.id));
   const map = new Map();
   (Array.isArray(local)?local:[]).forEach(item=>{ if(item && item.id!=null) map.set(item.id, item); });
   (Array.isArray(cloud)?cloud:[]).forEach(item=>{
     if(!item || item.id==null) return;
     const existing = map.get(item.id);
     if(!existing){ map.set(item.id, item); return; }
+    if(pending.has(item.id)) return;   // alteração local ainda por enviar: não a sobrepor
     const tLocal = Date.parse(existing.updated_at||existing.updatedAt||existing.createdAt||existing.data||0)||0;
     const tCloud = Date.parse(item.updated_at||item.updatedAt||item.createdAt||item.data||0)||0;
     map.set(item.id, tCloud >= tLocal ? item : existing);
@@ -4829,12 +5018,19 @@ async function sbPullData(silent=false){
     // para nunca perder algo criado neste dispositivo que ainda não chegou à
     // nuvem (ex: ficou em fila por falha de rede) e para trazer o que outro
     // dispositivo já sincronizou.
-    if(f){ faturas=_mergeById(faturas, f); DB.set('faturas',faturas); }
-    if(c){ contatos=_mergeById(contatos, c); DB.set('contatos',contatos); }
-    if(p){ produtos=_mergeById(produtos, p); DB.set('produtos',produtos); }
-    if(d){ despesas=_mergeById(despesas, d); DB.set('despesas',despesas); }
-    // "caixa" local (extracto de movimentos POS) propositadamente NÃO é
-    // substituído aqui — ver nota acima.
+    if(f){ faturas=_mergeById(faturas, f, 'faturas'); DB.set('faturas',faturas); }
+    if(c){ contatos=_mergeById(contatos, c, 'contatos'); DB.set('contatos',contatos); }
+    if(p){ produtos=_mergeById(produtos, p, 'produtos'); DB.set('produtos',produtos); }
+    if(d){ despesas=_mergeById(despesas, d, 'despesas'); DB.set('despesas',despesas); }
+    // "caixa" local (extracto de movimentos POS) não é substituído: as sessões
+    // da nuvem são reconciliadas com o estado local (abrir/fechar noutro dispositivo).
+    let cxOut={};
+    if(cxRes.ok){
+      const mine=(Array.isArray(cx)?cx:[]).filter(r=>!r.user_id||r.user_id===userId);
+      cxOut=caixaReconcile(mine);
+      if(cxOut.closedElsewhere) toast('A caixa foi fechada noutro dispositivo','error');
+      else if(cxOut.adopted) toast('Caixa aberta noutro dispositivo — sincronizada ✓');
+    }
     // Enviar para a nuvem o que só existe neste dispositivo (ex: criado antes
     // de entrar com conta, em "modo local"). Só se estes dados pertencerem a
     // esta conta (ou ainda não tiverem dono), para nunca misturar contas.
@@ -4873,7 +5069,7 @@ async function sbPullData(silent=false){
         const pg = ap && ap.id ? ap.id.replace(/^page-/,'') : 'dashboard';
         const rmap = { dashboard:renderDashboard, faturas:renderFaturas, clientes:renderClientes,
           fornecedores:renderFornecedores, stock:renderStock, produtos:renderProdutos,
-          despesas:renderDespesas, pl:renderPL };
+          despesas:renderDespesas, pl:renderPL, pos:renderPOS };
         if(rmap[pg]) rmap[pg]();
         else renderDashboard && renderDashboard();
       }catch(_){}
